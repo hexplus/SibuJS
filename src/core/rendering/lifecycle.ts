@@ -20,7 +20,18 @@
  * ```
  */
 
+import { devWarn } from "../dev";
+
 type CleanupFn = () => void;
+
+/** Safely invoke a lifecycle callback, catching and logging errors in dev mode. */
+function safeCall(cb: () => unknown, hookName: string): void {
+  try {
+    cb();
+  } catch (err) {
+    devWarn(`${hookName}: callback threw: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
 
 /**
  * Runs a callback once the component's element has been inserted into the DOM.
@@ -41,7 +52,7 @@ export function onMount(callback: () => undefined | CleanupFn, element?: HTMLEle
     // If element is already connected, run immediately (deferred)
     if (element.isConnected) {
       queueMicrotask(() => {
-        callback();
+        safeCall(callback, "onMount");
       });
       return;
     }
@@ -50,14 +61,14 @@ export function onMount(callback: () => undefined | CleanupFn, element?: HTMLEle
     const observer = new MutationObserver(() => {
       if (element.isConnected) {
         observer.disconnect();
-        callback();
+        safeCall(callback, "onMount");
       }
     });
 
     // Observe the document body for childList changes (subtree)
     queueMicrotask(() => {
       if (element.isConnected) {
-        callback();
+        safeCall(callback, "onMount");
       } else {
         observer.observe(document.body, { childList: true, subtree: true });
       }
@@ -65,7 +76,7 @@ export function onMount(callback: () => undefined | CleanupFn, element?: HTMLEle
   } else {
     // No element specified — just defer to next microtask (after render)
     queueMicrotask(() => {
-      callback();
+      safeCall(callback, "onMount");
     });
   }
 }
@@ -83,7 +94,7 @@ export function onUnmount(callback: CleanupFn, element: HTMLElement): void {
     const observer = new MutationObserver(() => {
       if (!element.isConnected) {
         observer.disconnect();
-        callback();
+        safeCall(callback, "onUnmount");
       }
     });
 

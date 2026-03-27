@@ -1,13 +1,11 @@
-import { enqueueBatchedSignal } from "../../reactivity/batch";
-import type { ReactiveSignal } from "../../reactivity/signal";
-import { notifySubscribers, recordDependency } from "../../reactivity/track";
+import { signal } from "./signal";
 
 /**
  * Deep equality comparison for objects and arrays.
  * Falls back to Object.is for primitives.
  * Handles circular references and common built-in types (Date, RegExp).
  */
-function deepEqual(a: unknown, b: unknown, seen?: Set<unknown>): boolean {
+export function deepEqual(a: unknown, b: unknown, seen?: Set<unknown>): boolean {
   if (Object.is(a, b)) return true;
   if (a == null || b == null) return false;
   if (typeof a !== typeof b) return false;
@@ -56,24 +54,5 @@ function deepEqual(a: unknown, b: unknown, seen?: Set<unknown>): boolean {
  * ```
  */
 export function deepSignal<T>(initial: T): [() => T, (next: T | ((prev: T) => T)) => void] {
-  const state: { value: T } = { value: initial };
-
-  function get(): T {
-    recordDependency(state as ReactiveSignal);
-    return state.value;
-  }
-
-  function set(next: T | ((prev: T) => T)): void {
-    const newValue = typeof next === "function" ? (next as (prev: T) => T)(state.value) : next;
-
-    // Use deep equality instead of Object.is
-    if (deepEqual(newValue, state.value)) return;
-    state.value = newValue;
-
-    if (!enqueueBatchedSignal(state as ReactiveSignal)) {
-      notifySubscribers(state as ReactiveSignal);
-    }
-  }
-
-  return [get, set];
+  return signal(initial, { equals: (a, b) => deepEqual(a, b) });
 }

@@ -7,9 +7,11 @@ type SetState<T> = (next: T | ((prev: T) => T)) => void;
 type StateTuple<T> = [() => T, SetState<T>];
 
 /** Options for signal */
-export interface SignalOptions {
+export interface SignalOptions<T = unknown> {
   /** Debug name for devtools inspection. Only used in development. */
   name?: string;
+  /** Custom equality function. Defaults to Object.is(). */
+  equals?: (prev: T, next: T) => boolean;
 }
 
 // DevTools hook accessor — property read is cheap (single hash lookup),
@@ -26,9 +28,10 @@ const _isDev = isDev();
  * @param initial Initial value
  * @param options Optional config: `{ name: "count" }` for devtools labeling
  */
-export function signal<T>(initial: T, options?: SignalOptions): StateTuple<T> {
+export function signal<T>(initial: T, options?: SignalOptions<T>): StateTuple<T> {
   const state: { value: T } = { value: initial };
   const debugName = _isDev ? options?.name : undefined;
+  const equalsFn = options?.equals;
 
   // Tag signal with debug name for devtools/introspection
   if (debugName) {
@@ -46,7 +49,7 @@ export function signal<T>(initial: T, options?: SignalOptions): StateTuple<T> {
 
   function set(next: T | ((prev: T) => T)): void {
     const newValue = typeof next === "function" ? (next as (prev: T) => T)(state.value) : next;
-    if (Object.is(newValue, state.value)) return;
+    if (equalsFn ? equalsFn(state.value, newValue) : Object.is(newValue, state.value)) return;
 
     if (_isDev) {
       const oldValue = state.value;

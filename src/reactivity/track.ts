@@ -1,6 +1,10 @@
+import { devWarn, isDev } from "../core/dev";
 import type { ReactiveSignal } from "./signal";
 
 type Subscriber = () => void;
+
+// Cache dev mode at module load for zero-cost production checks
+const _isDev = isDev();
 
 // Stack to support nested subscribers — pre-allocated with index for O(1) push/pop
 const subscriberStack: (Subscriber | null)[] = new Array(32);
@@ -22,6 +26,18 @@ type SignalWithCache = ReactiveSignal & { [SUBS]?: Set<Subscriber> };
 let notifyDepth = 0;
 const pendingQueue: Subscriber[] = [];
 const pendingSet = new Set<Subscriber>();
+
+/**
+ * Safely invoke a subscriber, catching errors to prevent one failing
+ * subscriber from killing remaining subscribers in the notification queue.
+ */
+function safeInvoke(sub: Subscriber): void {
+  try {
+    sub();
+  } catch (err) {
+    if (_isDev) devWarn(`Subscriber threw during notification: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
 
 // Suspend/resume tracking: counter-based for nested computed evaluations.
 let suspendDepth = 0;
@@ -79,6 +95,22 @@ export function resumeTracking(): void {
     stackTop--;
     currentSubscriber = stackTop >= 0 ? subscriberStack[stackTop] : null;
     trackingSuspended = false;
+  }
+}
+
+/**
+ * Execute a function without tracking any signal reads as dependencies.
+ * Useful for reading signals inside effects without creating subscriptions.
+ *
+ * @param fn Function to execute without dependency tracking
+ * @returns The return value of fn
+ */
+export function untracked<T>(fn: () => T): T {
+  suspendTracking();
+  try {
+    return fn();
+  } finally {
+    resumeTracking();
   }
 }
 
@@ -156,7 +188,7 @@ export function drainNotificationQueue(): void {
   try {
     let i = 0;
     while (i < pendingQueue.length) {
-      pendingQueue[i]();
+      safeInvoke(pendingQueue[i]);
       i++;
     }
   } finally {
@@ -265,12 +297,12 @@ export function notifySubscribers(signal: ReactiveSignal) {
       if (first._c) {
         propagateDirty(first);
       } else {
-        first();
+        safeInvoke(first);
       }
       // Drain cascading effects
       let i = 0;
       while (i < pendingQueue.length) {
-        pendingQueue[i]();
+        safeInvoke(pendingQueue[i]);
         i++;
       }
     } finally {
@@ -318,7 +350,7 @@ export function notifySubscribers(signal: ReactiveSignal) {
     for (let i = 0; i < directCount; i++) {
       if (!(pendingQueue[i] as any)._c) {
         if (!pendingSet.has(pendingQueue[i])) {
-          pendingQueue[i]();
+          safeInvoke(pendingQueue[i]);
         }
       }
     }
@@ -326,7 +358,7 @@ export function notifySubscribers(signal: ReactiveSignal) {
     // Pass 3: Drain cascading effects queued during propagation
     let i = directCount;
     while (i < pendingQueue.length) {
-      pendingQueue[i]();
+      safeInvoke(pendingQueue[i]);
       i++;
     }
   } finally {
