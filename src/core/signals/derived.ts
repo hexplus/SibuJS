@@ -1,5 +1,5 @@
 import type { ReactiveSignal } from "../../reactivity/signal";
-import { recordDependency, resumeTracking, suspendTracking, track, trackingSuspended } from "../../reactivity/track";
+import { recordDependency, track, trackingSuspended } from "../../reactivity/track";
 import { devAssert } from "../dev";
 
 /**
@@ -7,8 +7,10 @@ import { devAssert } from "../dev";
  *
  * Uses lazy pull-based evaluation with dirty flagging:
  * - When a dependency changes, the computed is marked dirty (no re-evaluation).
- * - Dirtiness propagates downstream via notifySubscribers.
+ * - Dirtiness propagates downstream via propagateDirty.
  * - The getter only re-evaluates when actually read (pull-based).
+ * - On re-evaluation, dependencies are re-tracked via track() so that
+ *   derived-of-derived chains propagate correctly.
  */
 export function derived<T>(getter: () => T, options?: { name?: string }): () => T {
   devAssert(typeof getter === "function", "derived: argument must be a getter function.");
@@ -24,6 +26,7 @@ export function derived<T>(getter: () => T, options?: { name?: string }): () => 
   (markDirty as any)._c = 1;
   (markDirty as any)._sig = cs;
 
+  // Initial evaluation — sets up dependencies
   track(() => {
     cs._d = false;
     cs._v = getter();
@@ -34,6 +37,8 @@ export function derived<T>(getter: () => T, options?: { name?: string }): () => 
 
   function computedGetter(): T {
     if (trackingSuspended) {
+      // Called during another derived's re-evaluation (propagateDirty eager path).
+      // Re-evaluate if dirty but don't re-track (we're inside suspended context).
       if (cs._d) {
         cs._d = false;
         cs._v = getter();
@@ -41,16 +46,21 @@ export function derived<T>(getter: () => T, options?: { name?: string }): () => 
       return cs._v;
     }
 
+    // Record that the caller depends on this derived
     recordDependency(cs as ReactiveSignal);
+
     if (cs._d) {
       const oldValue = cs._v;
-      cs._d = false;
-      suspendTracking();
-      try {
+
+      // Re-evaluate AND re-track dependencies.
+      // This is the key fix: track() cleans old deps and registers new ones,
+      // so derived-of-derived chains (e.g. F6=SUM(F2:F4) where F2 is also
+      // a formula) always have up-to-date dependency links.
+      track(() => {
+        cs._d = false;
         cs._v = getter();
-      } finally {
-        resumeTracking();
-      }
+      }, markDirty);
+
       // DevTools: emit computed recomputation
       if (hook && oldValue !== cs._v) {
         hook.emit("computed:update", { signal: cs, oldValue, newValue: cs._v });

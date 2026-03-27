@@ -180,25 +180,17 @@ export function drainNotificationQueue(): void {
  * Multi-dep computeds (e.g. aggregators in wide diamonds) are marked dirty
  * and pulled lazily — avoids O(n²) re-evaluation when many deps update.
  */
+/**
+ * Iteratively propagate dirty flags through a computed chain.
+ *
+ * Marks each computed dirty and walks downstream subscribers.
+ * Does NOT eagerly evaluate — computedGetter uses track() on re-evaluation
+ * to re-register dependencies, which is essential for derived-of-derived chains
+ * (e.g. formula cells referencing other formula cells).
+ */
 function propagateDirty(sub: () => void): void {
   sub(); // markDirty: sets dirty flag
   let sig: ReactiveSignal | undefined = (sub as any)._sig;
-
-  // Eager evaluation: suspend tracking once for entire chain walk.
-  // Only evaluate eagerly if the computed has a single dependency —
-  // that dep was just updated by us, so the value is safe to compute.
-  let suspended = false;
-  if (sig && (sig as any)._g) {
-    // Single-dep check: either _dep is set (exactly 1 dep) or _deps has size 1
-    const isSingleDep = (sub as any)._dep !== undefined || ((sub as any)._deps && (sub as any)._deps.size === 1);
-    if (isSingleDep) {
-      suspendTracking();
-      suspended = true;
-      const s: any = sig;
-      s._d = false;
-      s._v = s._g(); // evaluate first computed eagerly
-    }
-  }
 
   while (sig) {
     // Fast path: single subscriber cached in __f (common in computed chains)
@@ -206,21 +198,12 @@ function propagateDirty(sub: () => void): void {
     if (first) {
       if (first._c) {
         const nSig: any = first._sig;
-        // Set dirty directly (avoids megamorphic markDirty call)
+        // Mark dirty (no eager evaluation — let lazy pull + track() handle it)
         nSig._d = true;
-        if (suspended && nSig._g) {
-          // Only evaluate eagerly if single-dep (avoids O(n²) for wide diamonds)
-          const fSingleDep =
-            (first as any)._dep !== undefined || ((first as any)._deps && (first as any)._deps.size === 1);
-          if (fSingleDep) {
-            nSig._d = false;
-            nSig._v = nSig._g();
-          }
-        }
         sig = nSig;
         continue;
       }
-      // Single effect subscriber
+      // Single effect subscriber — queue it
       if (!pendingSet.has(first)) {
         pendingSet.add(first);
         pendingQueue.push(first);
@@ -249,8 +232,6 @@ function propagateDirty(sub: () => void): void {
     }
     sig = nextSig;
   }
-
-  if (suspended) resumeTracking();
 }
 
 /**

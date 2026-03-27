@@ -16,6 +16,7 @@ export * from "./src/ui/toast";
 export * from "./src/ui/infiniteScroll";
 export * from "./src/ui/pagination";
 export * from "./src/ui/eventBus";
+export * from "./src/ui/lazyEffect";
 export * from "./src/platform/customElement";
 export * from "./src/patterns/composable";
 export * from "./src/patterns/hoc";
