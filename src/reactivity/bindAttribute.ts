@@ -1,5 +1,8 @@
+import { devWarn, isDev } from "../core/dev";
 import { isUrlAttribute, sanitizeUrl } from "../utils/sanitize";
 import { track } from "./track";
+
+const _isDev = isDev();
 
 /**
  * Bind a reactive getter to an element attribute.
@@ -14,7 +17,9 @@ export function bindAttribute(el: HTMLElement, attr: string, getter: () => unkno
     let value: unknown;
     try {
       value = getter();
-    } catch {
+    } catch (err) {
+      if (_isDev)
+        devWarn(`bindAttribute: getter for "${attr}" threw: ${err instanceof Error ? err.message : String(err)}`);
       return;
     }
 
@@ -71,7 +76,8 @@ export function bindDynamic(
     let name: string;
     try {
       name = typeof nameGetter === "function" ? nameGetter() : nameGetter;
-    } catch {
+    } catch (err) {
+      if (_isDev) devWarn(`bindDynamic: name getter threw: ${err instanceof Error ? err.message : String(err)}`);
       return;
     }
 
@@ -79,7 +85,8 @@ export function bindDynamic(
     let value: unknown;
     try {
       value = typeof valueGetter === "function" ? valueGetter() : valueGetter;
-    } catch {
+    } catch (err) {
+      if (_isDev) devWarn(`bindDynamic: value getter threw: ${err instanceof Error ? err.message : String(err)}`);
       return;
     }
 

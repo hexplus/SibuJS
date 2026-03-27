@@ -1,7 +1,9 @@
 import { track } from "../../reactivity/track";
-import { devAssert } from "../dev";
+import { devAssert, devWarn, isDev } from "../dev";
 import { dispose } from "./dispose";
 import type { NodeChild } from "./types";
+
+const _isDev = isDev();
 
 /**
  * Resolves a NodeChild to a real Node.
@@ -165,7 +167,16 @@ export function each<T>(
       if (existing !== undefined) {
         node = existing;
       } else {
-        node = resolveNodeChild(render(arr[i], i));
+        try {
+          node = resolveNodeChild(render(arr[i], i));
+        } catch (err) {
+          if (_isDev) {
+            devWarn(
+              `each: render threw for item at index ${i} (key="${newKeys[i]}"): ${err instanceof Error ? err.message : String(err)}`,
+            );
+          }
+          node = document.createComment(`each:error:${i}`);
+        }
       }
       workMap.set(key, node);
       newNodes[i] = node;

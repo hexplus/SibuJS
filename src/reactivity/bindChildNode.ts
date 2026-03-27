@@ -1,5 +1,8 @@
+import { devWarn, isDev } from "../core/dev";
 import type { NodeChild } from "../core/rendering/types";
 import { track } from "./track";
+
+const _isDev = isDev();
 
 /**
  * Binds a reactive getter that returns NodeChild or NodeChild[] next to a placeholder comment.
@@ -16,7 +19,8 @@ export function bindChildNode(placeholder: Comment, getter: () => NodeChild | No
     let result: NodeChild | NodeChild[];
     try {
       result = getter();
-    } catch {
+    } catch (err) {
+      if (_isDev) devWarn(`bindChildNode: getter threw: ${err instanceof Error ? err.message : String(err)}`);
       return;
     }
 

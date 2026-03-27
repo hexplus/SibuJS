@@ -2,6 +2,12 @@ import { track } from "../../reactivity/track";
 import { devAssert } from "../dev";
 import { isSSR } from "../ssr-context";
 
+/** Options for effect */
+export interface EffectOptions {
+  /** Error handler for exceptions thrown during effect execution. */
+  onError?: (error: unknown) => void;
+}
+
 const _g = globalThis as any;
 
 /**
@@ -11,20 +17,34 @@ const _g = globalThis as any;
  *
  * In SSR mode, effect is a no-op — side effects should not run on the server.
  */
-export function effect(effectFn: () => void): () => void {
+export function effect(effectFn: () => void, options?: EffectOptions): () => void {
   devAssert(typeof effectFn === "function", "effect: argument must be a function.");
 
   // No-op during SSR — side effects are client-only
   if (isSSR()) return () => {};
 
+  const onError = options?.onError;
+
+  // When onError is provided, wrap the effect function in a try/catch.
+  // When not provided, use the raw effectFn — zero overhead for the default case.
+  const wrappedFn = onError
+    ? () => {
+        try {
+          effectFn();
+        } catch (err) {
+          onError(err);
+        }
+      }
+    : effectFn;
+
   let cleanupHandle: () => void = () => {};
 
   const subscriber = () => {
     cleanupHandle();
-    cleanupHandle = track(effectFn, subscriber);
+    cleanupHandle = track(wrappedFn, subscriber);
   };
 
-  cleanupHandle = track(effectFn, subscriber);
+  cleanupHandle = track(wrappedFn, subscriber);
 
   const hook = _g.__SIBU_DEVTOOLS_GLOBAL_HOOK__;
   if (hook) hook.emit("effect:create", { effectFn });

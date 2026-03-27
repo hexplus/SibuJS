@@ -51,6 +51,7 @@ export * from "./src/core/ssr-context";
 
 // Reactivity primitives
 export * from "./src/reactivity/batch";
+export { untracked } from "./src/reactivity/track";
 export { bindDynamic } from "./src/reactivity/bindAttribute";
 
 // Lazy loading & Suspense

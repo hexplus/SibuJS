@@ -27,7 +27,13 @@ const VOID_ELEMENTS = new Set([
 export function renderToString(element: HTMLElement | DocumentFragment | Node): string {
   if (element instanceof DocumentFragment) {
     return Array.from(element.childNodes)
-      .map((child) => renderToString(child))
+      .map((child) => {
+        try {
+          return renderToString(child);
+        } catch (err) {
+          return `<!--SSR error: ${escapeHtml(err instanceof Error ? err.message : String(err))}-->`;
+        }
+      })
       .join("");
   }
 
@@ -64,7 +70,11 @@ export function renderToString(element: HTMLElement | DocumentFragment | Node): 
   html += ">";
 
   for (const child of Array.from(element.childNodes)) {
-    html += renderToString(child);
+    try {
+      html += renderToString(child);
+    } catch (err) {
+      html += `<!--SSR error: ${escapeHtml(err instanceof Error ? err.message : String(err))}-->`;
+    }
   }
 
   html += `</${tag}>`;
@@ -116,7 +126,12 @@ export function renderToDocument(
     headExtra?: string;
   } = {},
 ): string {
-  const content = renderToString(component());
+  let content: string;
+  try {
+    content = renderToString(component());
+  } catch (err) {
+    content = `<!--SSR error: ${escapeHtml(err instanceof Error ? err.message : String(err))}-->`;
+  }
 
   const metaTags = (options.meta || [])
     .map(
@@ -172,7 +187,11 @@ export function renderToDocument(
 export async function* renderToStream(element: HTMLElement | DocumentFragment | Node): AsyncGenerator<string> {
   if (element instanceof DocumentFragment) {
     for (const child of Array.from(element.childNodes)) {
-      yield* renderToStream(child);
+      try {
+        yield* renderToStream(child);
+      } catch (err) {
+        yield `<!--SSR error: ${escapeHtml(err instanceof Error ? err.message : String(err))}-->`;
+      }
     }
     return;
   }
@@ -209,7 +228,11 @@ export async function* renderToStream(element: HTMLElement | DocumentFragment | 
   yield `${openTag}>`;
 
   for (const child of Array.from(element.childNodes)) {
-    yield* renderToStream(child);
+    try {
+      yield* renderToStream(child);
+    } catch (err) {
+      yield `<!--SSR error: ${escapeHtml(err instanceof Error ? err.message : String(err))}-->`;
+    }
   }
 
   yield `</${tag}>`;
