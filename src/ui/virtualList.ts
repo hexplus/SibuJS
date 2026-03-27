@@ -1,0 +1,70 @@
+import { effect } from "../core/signals/effect";
+import { signal } from "../core/signals/signal";
+
+// ============================================================================
+// VIRTUAL SCROLLING
+// ============================================================================
+
+export interface VirtualListProps<T> {
+  items: () => T[];
+  itemHeight: number;
+  containerHeight: number;
+  overscan?: number;
+  renderItem: (item: T, index: number) => HTMLElement;
+  class?: string;
+}
+
+/**
+ * VirtualList renders only visible items for efficient large-list rendering.
+ */
+export function VirtualList<T>(props: VirtualListProps<T>): HTMLElement {
+  const overscan = props.overscan ?? 3;
+  const [scrollTop, setScrollTop] = signal(0);
+
+  const container = document.createElement("div");
+  container.style.overflow = "auto";
+  container.style.height = `${props.containerHeight}px`;
+  container.style.position = "relative";
+  if (props.class) container.className = props.class;
+
+  const spacer = document.createElement("div");
+  spacer.style.position = "relative";
+
+  const content = document.createElement("div");
+  content.style.position = "absolute";
+  content.style.left = "0";
+  content.style.right = "0";
+
+  spacer.appendChild(content);
+  container.appendChild(spacer);
+
+  container.addEventListener("scroll", () => {
+    setScrollTop(container.scrollTop);
+  });
+
+  const update = () => {
+    const items = props.items();
+    const totalHeight = items.length * props.itemHeight;
+    spacer.style.height = `${totalHeight}px`;
+
+    const currentScroll = scrollTop();
+    const startIndex = Math.max(0, Math.floor(currentScroll / props.itemHeight) - overscan);
+    const visibleCount = Math.ceil(props.containerHeight / props.itemHeight) + 2 * overscan;
+    const endIndex = Math.min(items.length, startIndex + visibleCount);
+
+    content.style.top = `${startIndex * props.itemHeight}px`;
+
+    // Clear and re-render visible items
+    content.innerHTML = "";
+    for (let i = startIndex; i < endIndex; i++) {
+      const itemEl = props.renderItem(items[i], i);
+      itemEl.style.height = `${props.itemHeight}px`;
+      itemEl.style.boxSizing = "border-box";
+      content.appendChild(itemEl);
+    }
+  };
+
+  effect(update);
+
+  return container;
+}

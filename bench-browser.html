@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sibu — Browser Benchmark</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font: 14px/1.6 'Consolas', 'Monaco', monospace; background: #1a1a2e; color: #e0e0e0; padding: 24px; }
+    h1 { color: #e94560; margin-bottom: 8px; }
+    .subtitle { color: #888; margin-bottom: 24px; }
+    #controls { margin-bottom: 16px; }
+    button { background: #e94560; color: white; border: none; padding: 8px 20px; cursor: pointer; font: inherit; border-radius: 4px; }
+    button:hover { background: #c23152; }
+    button:disabled { background: #555; cursor: not-allowed; }
+    #output { white-space: pre; line-height: 1.5; }
+    .section { color: #f0c040; font-weight: bold; margin-top: 12px; }
+    .pass { color: #4ade80; }
+    .time { color: #60a5fa; }
+    .dim { color: #777; }
+    .summary { color: #f0c040; font-weight: bold; margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <h1>Sibu — Browser Benchmark</h1>
+  <p class="subtitle">Real DOM, real browser — no jsdom variance</p>
+  <div id="controls">
+    <button id="run-btn" onclick="runAll()">Run Benchmarks</button>
+    <span id="status" class="dim"></span>
+  </div>
+  <div id="output"></div>
+
+  <!-- Hidden container for DOM benchmarks -->
+  <div id="bench-container" style="position:absolute;left:-9999px;top:0;width:1000px;height:1000px;overflow:hidden;"></div>
+
+  <script src="dist/cdn.global.js"></script>
+  <script>
+    const { signal, effect, derived, watch, batch, div, span, button: btn, ul, li, mount, each, html } = Sibu;
+    const out = document.getElementById('output');
+    const status = document.getElementById('status');
+    const container = document.getElementById('bench-container');
+
+    function log(text, cls = '') {
+      const line = document.createElement('div');
+      if (cls) line.className = cls;
+      line.textContent = text;
+      out.appendChild(line);
+    }
+
+    function fmt(n) { return n.toLocaleString('en-US'); }
+    function fmtTime(ms) {
+      if (ms < 0.001) return `${(ms * 1_000_000).toFixed(0)} ns`;
+      if (ms < 1) return `${(ms * 1000).toFixed(0)} µs`;
+      if (ms < 1000) return `${ms.toFixed(2)} ms`;
+      return `${(ms / 1000).toFixed(2)} s`;
+    }
+
+    function bench(name, fn, { iterations = 1, warmup = 3 } = {}) {
+      // Warmup
+      for (let i = 0; i < warmup; i++) fn();
+
+      // Collect multiple samples for stability
+      const samples = [];
+      const targetSamples = 5;
+      for (let s = 0; s < targetSamples; s++) {
+        const start = performance.now();
+        for (let i = 0; i < iterations; i++) fn();
+        samples.push((performance.now() - start) / iterations);
+      }
+
+      // Use median to reduce outlier impact
+      samples.sort((a, b) => a - b);
+      const median = samples[Math.floor(samples.length / 2)];
+
+      const perOp = median;
+      const opsPerSec = 1000 / median;
+      const pad = name.padEnd(48);
+      log(`  ✓ ${pad} ${fmtTime(perOp).padStart(10)}  (${fmt(iterations)} iters, median of ${targetSamples})`, 'pass');
+      return { name: name.trim(), perOp, opsPerSec };
+    }
+
+    function section(title) {
+      log(`\n── ${title} ${'─'.repeat(56 - title.length)}`, 'section');
+    }
+
+    async function runAll() {
+      const runBtn = document.getElementById('run-btn');
+      runBtn.disabled = true;
+      out.innerHTML = '';
+      status.textContent = 'Running...';
+
+      // Yield to browser to update UI
+      await new Promise(r => setTimeout(r, 50));
+
+      const results = [];
+
+      // ── 1. Signal creation ──
+      section('1. Signal Creation');
+      results.push(bench('Create 100,000 signals', () => {
+        for (let i = 0; i < 100_000; i++) signal(i);
+      }, { iterations: 10 }));
+
+      await new Promise(r => setTimeout(r, 10));
+
+      // ── 2. Read/write ──
+      section('2. Signal Read / Write');
+      {
+        const [get, set] = signal(0);
+        results.push(bench('500,000 reads', () => {
+          for (let i = 0; i < 500_000; i++) get();
+        }, { iterations: 10 }));
+
+        results.push(bench('500,000 writes (no subscribers)', () => {
+          for (let i = 0; i < 500_000; i++) set(i);
+        }, { iterations: 10 }));
+      }
+
+      await new Promise(r => setTimeout(r, 10));
+
+      // ── 3. Computed ──
+      section('3. Computed Derivations');
+      {
+        const [get] = signal(1);
+        results.push(bench('Create 10,000 computed from 1 signal', () => {
+          for (let i = 0; i < 10_000; i++) derived(() => get() * 2);
+        }, { iterations: 5 }));
+
+        const [cGet, cSet] = signal(0);
+        let prev = cGet;
+        for (let i = 0; i < 1_000; i++) { const p = prev; prev = derived(() => p() + 1); }
+        const chainEnd = prev;
+        results.push(bench('Propagate 1,000-deep computed chain', () => {
+          for (let i = 0; i < 1000; i++) { cSet(i); chainEnd(); }
+        }, { iterations: 5 }));
+      }
+
+      await new Promise(r => setTimeout(r, 10));
+
+      // ── 4. Effects ──
+      section('4. Effect Tracking');
+      {
+        const [get, set] = signal(0);
+        const cleanups = [];
+        results.push(bench('Create 10,000 effects on 1 signal', () => {
+          for (let i = 0; i < 10_000; i++) cleanups.push(effect(() => { get(); }));
+        }, { iterations: 1, warmup: 0 }));
+
+        results.push(bench('Trigger 10,000 effects (1 update)', () => {
+          set(v => v + 1);
+        }, { iterations: 100 }));
+
+        for (const c of cleanups) c();
+      }
+
+      await new Promise(r => setTimeout(r, 10));
+
+      // ── 5. Batch ──
+      section('5. Batch Updates');
+      {
+        const N = 1_000;
+        const sigs = [];
+        for (let i = 0; i < N; i++) sigs.push(signal(0));
+        const cleanup = effect(() => { for (const [g] of sigs) g(); });
+
+        results.push(bench(`${fmt(N)} updates WITHOUT batch`, () => {
+          for (let i = 0; i < N; i++) sigs[i][1](v => v + 1);
+        }, { iterations: 5 }));
+
+        results.push(bench(`${fmt(N)} updates WITH batch`, () => {
+          batch(() => { for (let i = 0; i < N; i++) sigs[i][1](v => v + 1); });
+        }, { iterations: 10 }));
+
+        cleanup();
+      }
+
+      await new Promise(r => setTimeout(r, 10));
+
+      // ── 6. DOM creation (REAL DOM) ──
+      section('6. DOM Element Creation (real DOM)');
+      {
+        results.push(bench('Create 10,000 <div> (no props)', () => {
+          for (let i = 0; i < 10_000; i++) div();
+        }, { iterations: 10 }));
+
+        results.push(bench('Create 10,000 <div> with props', () => {
+          for (let i = 0; i < 10_000; i++) {
+            div({ id: `item-${i}`, class: 'card active', style: { color: 'red', fontSize: '14px' }, 'data-index': String(i) });
+          }
+        }, { iterations: 10 }));
+
+        results.push(bench('Create 10,000 nested (div>span+span)', () => {
+          for (let i = 0; i < 10_000; i++) {
+            div({ nodes: [span({ nodes: ['Hello'] }), span({ nodes: ['World'] })] });
+          }
+        }, { iterations: 5 }));
+      }
+
+      await new Promise(r => setTimeout(r, 10));
+
+      // ── 7. Authoring styles ──
+      section('7. Authoring Styles — Deep Nesting');
+      {
+        const handler = () => {};
+
+        results.push(bench('props obj:  10,000 deep+event', () => {
+          for (let i = 0; i < 10_000; i++) {
+            div({ class: 'card', nodes: [
+              div({ class: 'body', nodes: [
+                span({ nodes: `Item ${i}` }),
+                btn({ nodes: 'Click', class: 'btn', on: { click: handler } }),
+              ] }),
+            ] });
+          }
+        }, { iterations: 5 }));
+
+        results.push(bench('shorthand:  10,000 deep+event', () => {
+          for (let i = 0; i < 10_000; i++) {
+            div('card', [
+              div('body', [
+                span(`Item ${i}`),
+                btn({ nodes: 'Click', class: 'btn', on: { click: handler } }),
+              ]),
+            ]);
+          }
+        }, { iterations: 5 }));
+
+        results.push(bench('html tmpl:  10,000 deep+event', () => {
+          for (let i = 0; i < 10_000; i++) {
+            html`<div class="card"><div class="body"><span>${`Item ${i}`}</span><button class="btn" on:click=${handler}>Click</button></div></div>`;
+          }
+        }, { iterations: 5 }));
+      }
+
+      await new Promise(r => setTimeout(r, 10));
+
+      // ── 8. Mounted reactive DOM ──
+      section('8. Reactive DOM Updates (mounted)');
+      {
+        container.innerHTML = '';
+        const [getText, setText] = signal('initial');
+        const [getCls, setCls] = signal('off');
+
+        const el = div({ class: getCls, nodes: [() => getText()] });
+        mount(el, container);
+        await new Promise(r => setTimeout(r, 10));
+
+        results.push(bench('10,000 reactive class updates', () => {
+          for (let i = 0; i < 10_000; i++) setCls(i % 2 === 0 ? 'on' : 'off');
+        }, { iterations: 5 }));
+
+        results.push(bench('10,000 reactive text updates', () => {
+          for (let i = 0; i < 10_000; i++) setText(`Count: ${i}`);
+        }, { iterations: 5 }));
+
+        container.innerHTML = '';
+      }
+
+      await new Promise(r => setTimeout(r, 10));
+
+      // ── 9. List rendering (mounted, real DOM) ──
+      section('9. List Rendering (mounted, real DOM)');
+      {
+        container.innerHTML = '';
+        const [getItems, setItems] = signal(
+          Array.from({ length: 1000 }, (_, i) => ({ id: i, label: `Item ${i}` }))
+        );
+
+        const list = ul({ nodes: [
+          each(getItems, (item) => li({ nodes: [item.label] }), { key: (item) => item.id }),
+        ] });
+
+        mount(list, container);
+        await new Promise(r => setTimeout(r, 50));
+
+        results.push(bench('Append 1,000 to 1,000-item list', () => {
+          setItems(prev => [
+            ...prev.slice(0, 1000),
+            ...Array.from({ length: 1000 }, (_, i) => ({ id: 10000 + i + Math.random() * 100000, label: `New ${i}` })),
+          ]);
+        }, { iterations: 20 }));
+
+        setItems(Array.from({ length: 1000 }, (_, i) => ({ id: i, label: `Item ${i}` })));
+        await new Promise(r => setTimeout(r, 50));
+
+        results.push(bench('Reverse 1,000-item list', () => {
+          setItems(prev => [...prev].reverse());
+        }, { iterations: 50 }));
+
+        setItems(Array.from({ length: 1000 }, (_, i) => ({ id: i + 90000, label: `Item ${i}` })));
+        await new Promise(r => setTimeout(r, 50));
+
+        results.push(bench('Shuffle 1,000-item list', () => {
+          setItems(prev => {
+            const copy = [...prev];
+            for (let i = copy.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [copy[i], copy[j]] = [copy[j], copy[i]];
+            }
+            return copy;
+          });
+        }, { iterations: 50 }));
+
+        container.innerHTML = '';
+      }
+
+      await new Promise(r => setTimeout(r, 10));
+
+      // ── 10. Diamond ──
+      section('10. Diamond Dependency Graph');
+      {
+        const [getA, setA] = signal(0);
+        const getB = derived(() => getA() + 1);
+        const getC = derived(() => getA() * 2);
+        const getD = derived(() => getB() + getC());
+        let d = 0;
+        const cleanup = effect(() => { getD(); d++; });
+
+        d = 0;
+        results.push(bench('Diamond: 10,000 root updates', () => {
+          for (let i = 0; i < 10_000; i++) setA(i);
+        }, { iterations: 5 }));
+
+        cleanup();
+
+        const WIDTH = 500;
+        const [rootGet, rootSet] = signal(0);
+        const leaves = [];
+        for (let i = 0; i < WIDTH; i++) leaves.push(derived(() => rootGet() + i));
+        const aggregator = derived(() => { let sum = 0; for (const l of leaves) sum += l(); return sum; });
+        const cleanup2 = effect(() => { aggregator(); });
+
+        results.push(bench(`Wide diamond (${WIDTH} branches): 1K updates`, () => {
+          for (let i = 0; i < 1_000; i++) rootSet(i);
+        }, { iterations: 5 }));
+
+        cleanup2();
+      }
+
+      // ── Summary ──
+      log('', 'summary');
+      log(`── Summary ${'─'.repeat(54)}`, 'summary');
+      const totalMs = results.reduce((s, r) => s + r.perOp, 0);
+      log(`  ${results.length} benchmarks completed`);
+      log(`  Browser: ${navigator.userAgent.split(') ')[0].split('(')[1] || navigator.userAgent}`);
+
+      status.textContent = 'Done!';
+      runBtn.disabled = false;
+    }
+  </script>
+</body>
+</html>

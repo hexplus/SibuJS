@@ -1,0 +1,28 @@
+# Node.js
+node_modules/
+package-lock.json
+.npm/
+
+# Build output
+dist/
+*.log
+
+# Editor/IDE
+.vscode/
+.idea/
+
+# Tests
+coverage/
+*.test.ts.snap
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Optional: vitest cache
+vitest-cache/
+
+# Temporary files
+*.tmp
+*.swp
+notes.txt

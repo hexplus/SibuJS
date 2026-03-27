@@ -1,0 +1,217 @@
+import { derived } from "../core/signals/derived";
+import { signal } from "../core/signals/signal";
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+export type ValidatorFn<T = unknown> = (value: T) => string | null;
+
+export interface FieldConfig<T = unknown> {
+  initial: T;
+  validators?: ValidatorFn<T>[];
+}
+
+export type FormConfig<T extends Record<string, unknown>> = {
+  [K in keyof T]: FieldConfig<T[K]>;
+};
+
+export interface FormField<T = unknown> {
+  value: () => T;
+  set: (v: T) => void;
+  error: () => string | null;
+  touched: () => boolean;
+  touch: () => void;
+  reset: () => void;
+}
+
+export interface FormReturn<T extends Record<string, unknown>> {
+  fields: { [K in keyof T]: FormField<T[K]> };
+  errors: () => Partial<Record<keyof T, string | null>>;
+  isValid: () => boolean;
+  isDirty: () => boolean;
+  touched: () => Partial<Record<keyof T, boolean>>;
+  values: () => T;
+  handleSubmit: (onSubmit: (values: T) => void | Promise<void>) => (e?: Event) => void;
+  reset: () => void;
+  setError: (field: keyof T, message: string) => void;
+}
+
+// ============================================================================
+// BUILT-IN VALIDATORS
+// ============================================================================
+
+export function required(message = "This field is required"): ValidatorFn<unknown> {
+  return (value: unknown) => {
+    if (value == null || value === "" || (Array.isArray(value) && value.length === 0)) {
+      return message;
+    }
+    return null;
+  };
+}
+
+export function minLength(min: number, message?: string): ValidatorFn<string> {
+  return (value: string) => {
+    if (value && value.length < min) {
+      return message || `Must be at least ${min} characters`;
+    }
+    return null;
+  };
+}
+
+export function maxLength(max: number, message?: string): ValidatorFn<string> {
+  return (value: string) => {
+    if (value && value.length > max) {
+      return message || `Must be at most ${max} characters`;
+    }
+    return null;
+  };
+}
+
+export function matchesPattern(regex: RegExp, message = "Invalid format"): ValidatorFn<string> {
+  return (value: string) => {
+    if (value && !regex.test(value)) {
+      return message;
+    }
+    return null;
+  };
+}
+
+export function email(message = "Invalid email address"): ValidatorFn<string> {
+  return matchesPattern(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, message);
+}
+
+export function min(minVal: number, message?: string): ValidatorFn<number> {
+  return (value: number) => {
+    if (value != null && value < minVal) {
+      return message || `Must be at least ${minVal}`;
+    }
+    return null;
+  };
+}
+
+export function max(maxVal: number, message?: string): ValidatorFn<number> {
+  return (value: number) => {
+    if (value != null && value > maxVal) {
+      return message || `Must be at most ${maxVal}`;
+    }
+    return null;
+  };
+}
+
+export function custom<T>(fn: (value: T) => boolean, message: string): ValidatorFn<T> {
+  return (value: T) => (fn(value) ? null : message);
+}
+
+// ============================================================================
+// form HOOK
+// ============================================================================
+
+export function form<T extends Record<string, unknown>>(config: FormConfig<T>): FormReturn<T> {
+  const fieldEntries = Object.entries(config) as [keyof T, FieldConfig][];
+  const fieldMap = {} as { [K in keyof T]: FormField<T[K]> };
+  const [manualErrors, setManualErrors] = signal<Record<string, string | null>>({});
+
+  for (const [name, cfg] of fieldEntries) {
+    const [value, setValue] = signal<T[keyof T]>(cfg.initial as T[keyof T]);
+    const [isTouched, setTouched] = signal(false);
+
+    const error = derived<string | null>(() => {
+      const manual = manualErrors();
+      if (manual[name as string]) return manual[name as string];
+      const val = value();
+      if (!cfg.validators) return null;
+      for (const validator of cfg.validators) {
+        const msg = validator(val);
+        if (msg) return msg;
+      }
+      return null;
+    });
+
+    fieldMap[name] = {
+      value,
+      set: setValue,
+      error,
+      touched: isTouched,
+      touch: () => setTouched(true),
+      reset: () => {
+        setValue(cfg.initial as T[keyof T]);
+        setTouched(false);
+        setManualErrors((prev) => ({ ...prev, [name as string]: null }));
+      },
+    };
+  }
+
+  const errors = derived(() => {
+    const result: Partial<Record<keyof T, string | null>> = {};
+    for (const [name, field] of Object.entries(fieldMap) as [keyof T, FormField][]) {
+      result[name] = field.error();
+    }
+    return result;
+  });
+
+  const isValid = derived(() => {
+    for (const field of Object.values(fieldMap) as FormField[]) {
+      if (field.error() != null) return false;
+    }
+    return true;
+  });
+
+  const isDirty = derived(() => {
+    for (const [name, cfg] of fieldEntries) {
+      if (!Object.is(fieldMap[name].value(), cfg.initial)) return true;
+    }
+    return false;
+  });
+
+  const touchedState = derived(() => {
+    const result: Partial<Record<keyof T, boolean>> = {};
+    for (const [name, field] of Object.entries(fieldMap) as [keyof T, FormField][]) {
+      result[name] = field.touched();
+    }
+    return result;
+  });
+
+  const values = derived(() => {
+    const result = {} as T;
+    for (const [name, field] of Object.entries(fieldMap) as [keyof T, FormField][]) {
+      (result as Record<string, unknown>)[name as string] = field.value();
+    }
+    return result;
+  });
+
+  function handleSubmit(onSubmit: (values: T) => void | Promise<void>) {
+    return (e?: Event) => {
+      if (e) e.preventDefault();
+      // Touch all fields
+      for (const field of Object.values(fieldMap) as FormField[]) {
+        field.touch();
+      }
+      if (isValid()) {
+        onSubmit(values());
+      }
+    };
+  }
+
+  function reset() {
+    for (const field of Object.values(fieldMap) as FormField[]) {
+      field.reset();
+    }
+  }
+
+  function setError(field: keyof T, message: string) {
+    setManualErrors((prev) => ({ ...prev, [field as string]: message }));
+  }
+
+  return {
+    fields: fieldMap,
+    errors,
+    isValid,
+    isDirty,
+    touched: touchedState,
+    values,
+    handleSubmit,
+    reset,
+    setError,
+  };
+}

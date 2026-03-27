@@ -1,0 +1,69 @@
+import { span } from "../core/rendering/html";
+import { signal } from "../core/signals/signal";
+
+type Translations = Record<string, string>;
+type LocaleMap = Record<string, Translations>;
+type Params = Record<string, string | number>;
+
+const [currentLocale, setLocaleInternal] = signal("en");
+const locales: LocaleMap = {};
+
+export function setLocale(locale: string) {
+  setLocaleInternal(locale);
+}
+
+/**
+ * Get the current locale reactively.
+ */
+export function getLocale(): string {
+  return currentLocale();
+}
+
+export function registerTranslations(locale: string, messages: Translations) {
+  locales[locale] = { ...locales[locale], ...messages };
+}
+
+export function t(key: string, params?: Params): string {
+  const locale = currentLocale();
+  const message = locales[locale]?.[key] || key;
+
+  return params ? message.replace(/\{(\w+)\}/g, (_, p) => String(params[p] ?? "")) : message;
+}
+
+/**
+ * Trans component — renders a translated string reactively.
+ * Automatically updates when the locale changes.
+ *
+ * @param key Translation key
+ * @param params Optional interpolation parameters
+ * @returns An HTMLElement (span) that reactively shows the translated text
+ *
+ * @example
+ * ```ts
+ * registerTranslations("en", { greeting: "Hello, {name}!" });
+ * registerTranslations("es", { greeting: "Hola, {name}!" });
+ *
+ * div({ nodes: [Trans("greeting", { name: "World" })] });
+ * // When locale changes, the text updates automatically
+ * ```
+ */
+export function Trans(key: string, params?: Params): HTMLElement {
+  return span({
+    nodes: () => t(key, params),
+  }) as HTMLElement;
+}
+
+/**
+ * Check if a translation key exists for the current locale.
+ */
+export function hasTranslation(key: string): boolean {
+  const locale = currentLocale();
+  return key in (locales[locale] || {});
+}
+
+/**
+ * Get all available locales.
+ */
+export function getAvailableLocales(): string[] {
+  return Object.keys(locales);
+}

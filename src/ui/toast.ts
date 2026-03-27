@@ -1,0 +1,74 @@
+import { signal } from "../core/signals/signal";
+
+/**
+ * Toast notification system with auto-dismiss and max toast limits.
+ */
+
+export interface Toast {
+  id: string;
+  message: string;
+  type?: "info" | "success" | "error" | "warning";
+}
+
+let toastCounter = 0;
+
+export function toast(options?: { duration?: number; maxToasts?: number }): {
+  toasts: () => Toast[];
+  show: (message: string, type?: Toast["type"]) => string;
+  dismiss: (id: string) => void;
+  dismissAll: () => void;
+} {
+  const duration = options?.duration ?? 3000;
+  const maxToasts = options?.maxToasts ?? Infinity;
+  const [toasts, setToasts] = signal<Toast[]>([]);
+  const timers = new Map<string, ReturnType<typeof setTimeout>>();
+
+  function show(message: string, type?: Toast["type"]): string {
+    const id = `toast-${++toastCounter}`;
+    const toast: Toast = { id, message, type };
+
+    setToasts((prev) => {
+      const next = [...prev, toast];
+      // Trim oldest toasts if over max
+      if (next.length > maxToasts) {
+        const removed = next.splice(0, next.length - maxToasts);
+        for (const r of removed) {
+          clearTimerForToast(r.id);
+        }
+      }
+      return next;
+    });
+
+    if (duration > 0) {
+      const timer = setTimeout(() => {
+        dismiss(id);
+      }, duration);
+      timers.set(id, timer);
+    }
+
+    return id;
+  }
+
+  function dismiss(id: string): void {
+    clearTimerForToast(id);
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }
+
+  function dismissAll(): void {
+    for (const timer of timers.values()) {
+      clearTimeout(timer);
+    }
+    timers.clear();
+    setToasts([]);
+  }
+
+  function clearTimerForToast(id: string): void {
+    const timer = timers.get(id);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      timers.delete(id);
+    }
+  }
+
+  return { toasts, show, dismiss, dismissAll };
+}

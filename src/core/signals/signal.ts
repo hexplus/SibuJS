@@ -1,0 +1,71 @@
+import { enqueueBatchedSignal } from "../../reactivity/batch";
+import type { ReactiveSignal } from "../../reactivity/signal";
+import { notifySubscribers, recordDependency } from "../../reactivity/track";
+import { isDev } from "../dev";
+
+type SetState<T> = (next: T | ((prev: T) => T)) => void;
+type StateTuple<T> = [() => T, SetState<T>];
+
+/** Options for signal */
+export interface SignalOptions {
+  /** Debug name for devtools inspection. Only used in development. */
+  name?: string;
+}
+
+// DevTools hook accessor — property read is cheap (single hash lookup),
+// and allows tests to set the hook after module load.
+const _g = globalThis as any;
+
+// Cache dev mode at module load — avoids checking on every signal write
+const _isDev = isDev();
+
+/**
+ * signal creates a reactive signal that holds a value of type T.
+ * Returns a tuple: [getter, setter].
+ *
+ * @param initial Initial value
+ * @param options Optional config: `{ name: "count" }` for devtools labeling
+ */
+export function signal<T>(initial: T, options?: SignalOptions): StateTuple<T> {
+  const state: { value: T } = { value: initial };
+  const debugName = _isDev ? options?.name : undefined;
+
+  // Tag signal with debug name for devtools/introspection
+  if (debugName) {
+    (state as Record<string, unknown>).__name = debugName;
+  }
+
+  function get(): T {
+    recordDependency(state as ReactiveSignal);
+    return state.value;
+  }
+
+  // Tag getter with signal reference for dependency introspection
+  (get as unknown as Record<string, unknown>).__signal = state;
+  if (debugName) (get as unknown as Record<string, unknown>).__name = debugName;
+
+  function set(next: T | ((prev: T) => T)): void {
+    const newValue = typeof next === "function" ? (next as (prev: T) => T)(state.value) : next;
+    if (Object.is(newValue, state.value)) return;
+
+    if (_isDev) {
+      const oldValue = state.value;
+      state.value = newValue;
+      const hook = _g.__SIBU_DEVTOOLS_GLOBAL_HOOK__;
+      if (hook) hook.emit("signal:update", { signal: state, name: debugName, oldValue, newValue });
+    } else {
+      state.value = newValue;
+    }
+
+    if (!enqueueBatchedSignal(state as ReactiveSignal)) {
+      notifySubscribers(state as ReactiveSignal);
+    }
+  }
+
+  if (_isDev) {
+    const hook = _g.__SIBU_DEVTOOLS_GLOBAL_HOOK__;
+    if (hook) hook.emit("signal:create", { signal: state, name: debugName, getter: get, initial });
+  }
+
+  return [get, set];
+}

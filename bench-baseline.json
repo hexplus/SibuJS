@@ -1,0 +1,254 @@
+[
+  {
+    "name": "Create 100,000 signals",
+    "elapsed": 11.18,
+    "iterations": 10,
+    "perOp": 1.118,
+    "opsPerSec": 895
+  },
+  {
+    "name": "500,000 reads",
+    "elapsed": 9.85,
+    "iterations": 10,
+    "perOp": 0.985,
+    "opsPerSec": 1015
+  },
+  {
+    "name": "500,000 writes (no subscribers)",
+    "elapsed": 44.57,
+    "iterations": 10,
+    "perOp": 4.457,
+    "opsPerSec": 224
+  },
+  {
+    "name": "Create 10,000 computed from 1 signal",
+    "elapsed": 11.2,
+    "iterations": 5,
+    "perOp": 2.24,
+    "opsPerSec": 446
+  },
+  {
+    "name": "Propagate through 1,000-deep computed chain",
+    "elapsed": 56.86,
+    "iterations": 5,
+    "perOp": 11.373,
+    "opsPerSec": 88
+  },
+  {
+    "name": "Create 10,000 effects on 1 signal",
+    "elapsed": 3.76,
+    "iterations": 1,
+    "perOp": 3.76,
+    "opsPerSec": 266
+  },
+  {
+    "name": "Trigger 10,000 effects (1 signal update)",
+    "elapsed": 104.39,
+    "iterations": 100,
+    "perOp": 1.044,
+    "opsPerSec": 958
+  },
+  {
+    "name": "Notify 5,000 watchers per update",
+    "elapsed": 18.7,
+    "iterations": 200,
+    "perOp": 0.094,
+    "opsPerSec": 10693
+  },
+  {
+    "name": "1,000 updates WITHOUT batch",
+    "elapsed": 1052.13,
+    "iterations": 10,
+    "perOp": 105.213,
+    "opsPerSec": 10
+  },
+  {
+    "name": "1,000 updates WITH batch",
+    "elapsed": 3.5,
+    "iterations": 10,
+    "perOp": 0.35,
+    "opsPerSec": 2860
+  },
+  {
+    "name": "Create 10,000 <div> elements (no props)",
+    "elapsed": 77.6,
+    "iterations": 10,
+    "perOp": 7.76,
+    "opsPerSec": 129
+  },
+  {
+    "name": "Create 10,000 <div> with props",
+    "elapsed": 722.79,
+    "iterations": 10,
+    "perOp": 72.279,
+    "opsPerSec": 14
+  },
+  {
+    "name": "Create 10,000 nested trees (div > span + span)",
+    "elapsed": 275.64,
+    "iterations": 5,
+    "perOp": 55.128,
+    "opsPerSec": 18
+  },
+  {
+    "name": "props obj:  10,000 <div>",
+    "elapsed": 92.07,
+    "iterations": 10,
+    "perOp": 9.207,
+    "opsPerSec": 109
+  },
+  {
+    "name": "shorthand:  10,000 <div>",
+    "elapsed": 86.14,
+    "iterations": 10,
+    "perOp": 8.614,
+    "opsPerSec": 116
+  },
+  {
+    "name": "html tmpl:  10,000 <div>",
+    "elapsed": 87.23,
+    "iterations": 10,
+    "perOp": 8.723,
+    "opsPerSec": 115
+  },
+  {
+    "name": "props obj:  10,000 <p class+text>",
+    "elapsed": 258.98,
+    "iterations": 10,
+    "perOp": 25.898,
+    "opsPerSec": 39
+  },
+  {
+    "name": "shorthand:  10,000 <p class+text>",
+    "elapsed": 252.9,
+    "iterations": 10,
+    "perOp": 25.29,
+    "opsPerSec": 40
+  },
+  {
+    "name": "html tmpl:  10,000 <p class+text>",
+    "elapsed": 262.8,
+    "iterations": 10,
+    "perOp": 26.28,
+    "opsPerSec": 38
+  },
+  {
+    "name": "props obj:  10,000 <div> dyn attrs",
+    "elapsed": 361.11,
+    "iterations": 10,
+    "perOp": 36.111,
+    "opsPerSec": 28
+  },
+  {
+    "name": "shorthand:  10,000 <div> dyn attrs",
+    "elapsed": 344.94,
+    "iterations": 10,
+    "perOp": 34.494,
+    "opsPerSec": 29
+  },
+  {
+    "name": "html tmpl:  10,000 <div> dyn attrs",
+    "elapsed": 365.7,
+    "iterations": 10,
+    "perOp": 36.57,
+    "opsPerSec": 27
+  },
+  {
+    "name": "props obj:  10,000 nested",
+    "elapsed": 270.14,
+    "iterations": 5,
+    "perOp": 54.028,
+    "opsPerSec": 19
+  },
+  {
+    "name": "shorthand:  10,000 nested",
+    "elapsed": 263.14,
+    "iterations": 5,
+    "perOp": 52.629,
+    "opsPerSec": 19
+  },
+  {
+    "name": "html tmpl:  10,000 nested",
+    "elapsed": 261.79,
+    "iterations": 5,
+    "perOp": 52.357,
+    "opsPerSec": 19
+  },
+  {
+    "name": "props obj:  10,000 deep+event",
+    "elapsed": 512.73,
+    "iterations": 5,
+    "perOp": 102.546,
+    "opsPerSec": 10
+  },
+  {
+    "name": "shorthand:  10,000 deep+event",
+    "elapsed": 500.25,
+    "iterations": 5,
+    "perOp": 100.05,
+    "opsPerSec": 10
+  },
+  {
+    "name": "html tmpl:  10,000 deep+event",
+    "elapsed": 732.1,
+    "iterations": 5,
+    "perOp": 146.419,
+    "opsPerSec": 7
+  },
+  {
+    "name": "10,000 reactive class updates",
+    "elapsed": 53.84,
+    "iterations": 5,
+    "perOp": 10.769,
+    "opsPerSec": 93
+  },
+  {
+    "name": "Append 1,000 items to 1,000-item list",
+    "elapsed": 2430.99,
+    "iterations": 50,
+    "perOp": 48.62,
+    "opsPerSec": 21
+  },
+  {
+    "name": "Reverse 1,000-item list",
+    "elapsed": 1443.45,
+    "iterations": 100,
+    "perOp": 14.434,
+    "opsPerSec": 69
+  },
+  {
+    "name": "Remove every 2nd item from 2,000-item list",
+    "elapsed": 2.79,
+    "iterations": 50,
+    "perOp": 0.056,
+    "opsPerSec": 17952
+  },
+  {
+    "name": "Shuffle 1,000-item list (random reorder)",
+    "elapsed": 2344.03,
+    "iterations": 100,
+    "perOp": 23.44,
+    "opsPerSec": 43
+  },
+  {
+    "name": "Clear 5,000-item list",
+    "elapsed": 0.02,
+    "iterations": 50,
+    "perOp": 0,
+    "opsPerSec": 2049180
+  },
+  {
+    "name": "Diamond graph: 10,000 root updates",
+    "elapsed": 29.39,
+    "iterations": 5,
+    "perOp": 5.879,
+    "opsPerSec": 170
+  },
+  {
+    "name": "Wide diamond (500 branches): 1,000 root updates",
+    "elapsed": 92.48,
+    "iterations": 5,
+    "perOp": 18.496,
+    "opsPerSec": 54
+  }
+]
