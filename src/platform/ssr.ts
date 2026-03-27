@@ -2,6 +2,18 @@
 // SERVER-SIDE RENDERING
 // ============================================================================
 
+import { isDev } from "../core/dev";
+
+const _isDev = isDev();
+
+/** Format an SSR error as an HTML comment. In production, omits the message to prevent information leakage. */
+function ssrErrorComment(err: unknown): string {
+  if (_isDev) {
+    return `<!--SSR error: ${escapeHtml(err instanceof Error ? err.message : String(err))}-->`;
+  }
+  return "<!--SSR error-->";
+}
+
 const VOID_ELEMENTS = new Set([
   "area",
   "base",
@@ -31,7 +43,7 @@ export function renderToString(element: HTMLElement | DocumentFragment | Node): 
         try {
           return renderToString(child);
         } catch (err) {
-          return `<!--SSR error: ${escapeHtml(err instanceof Error ? err.message : String(err))}-->`;
+          return ssrErrorComment(err);
         }
       })
       .join("");
@@ -73,7 +85,7 @@ export function renderToString(element: HTMLElement | DocumentFragment | Node): 
     try {
       html += renderToString(child);
     } catch (err) {
-      html += `<!--SSR error: ${escapeHtml(err instanceof Error ? err.message : String(err))}-->`;
+      html += ssrErrorComment(err);
     }
   }
 
@@ -130,7 +142,7 @@ export function renderToDocument(
   try {
     content = renderToString(component());
   } catch (err) {
-    content = `<!--SSR error: ${escapeHtml(err instanceof Error ? err.message : String(err))}-->`;
+    content = ssrErrorComment(err);
   }
 
   const metaTags = (options.meta || [])
@@ -190,7 +202,7 @@ export async function* renderToStream(element: HTMLElement | DocumentFragment | 
       try {
         yield* renderToStream(child);
       } catch (err) {
-        yield `<!--SSR error: ${escapeHtml(err instanceof Error ? err.message : String(err))}-->`;
+        yield ssrErrorComment(err);
       }
     }
     return;
@@ -231,7 +243,7 @@ export async function* renderToStream(element: HTMLElement | DocumentFragment | 
     try {
       yield* renderToStream(child);
     } catch (err) {
-      yield `<!--SSR error: ${escapeHtml(err instanceof Error ? err.message : String(err))}-->`;
+      yield ssrErrorComment(err);
     }
   }
 
@@ -392,11 +404,12 @@ export function ssrSuspense(props: { fallback: () => HTMLElement; content: () =>
  * Generate an inline script that swaps a suspense fallback with resolved content.
  * The id is escaped for both JS string and HTML attribute contexts to prevent injection.
  */
-export function suspenseSwapScript(id: string): string {
+export function suspenseSwapScript(id: string, nonce?: string): string {
   // Escape for JS string context (backslash, quotes) and HTML context (angle brackets)
   const safeId = id.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/</g, "\\u003c").replace(/>/g, "\\u003e");
+  const nonceAttr = nonce ? ` nonce="${escapeAttr(nonce)}"` : "";
   return (
-    "<script>(function(){" +
+    `<script${nonceAttr}>(function(){` +
     `var t=document.getElementById("sibu-resolved-${safeId}");` +
     `var f=document.querySelector('[data-sibu-suspense-id="${safeId}"]');` +
     // Use appendChild loop instead of innerHTML to avoid DOM-based XSS
@@ -434,17 +447,27 @@ const SSR_DATA_ATTR = "__SIBU_SSR_DATA__";
  * The serialized data is embedded in the document and picked up
  * on the client with `deserializeState()`.
  */
-export function serializeState(state: Record<string, unknown>): string {
+export function serializeState(state: Record<string, unknown>, nonce?: string): string {
   const json = JSON.stringify(state).replace(/</g, "\\u003c").replace(/>/g, "\\u003e").replace(/&/g, "\\u0026");
-  return `<script>window.${SSR_DATA_ATTR}=${json}</script>`;
+  const nonceAttr = nonce ? ` nonce="${escapeAttr(nonce)}"` : "";
+  return `<script${nonceAttr}>window.${SSR_DATA_ATTR}=${json}</script>`;
 }
 
 /**
  * Retrieve state that was embedded by `serializeState()` during SSR.
+ *
+ * When a `validate` function is provided, it acts as a type guard —
+ * only data that passes validation is returned. This prevents
+ * tampered SSR payloads from being trusted by the client.
+ *
+ * @param validate Optional type guard to verify data integrity
  */
-export function deserializeState<T = Record<string, unknown>>(): T | undefined {
+export function deserializeState<T = Record<string, unknown>>(validate?: (data: unknown) => data is T): T | undefined {
   if (typeof window === "undefined") return undefined;
-  return (window as unknown as Record<string, unknown>)[SSR_DATA_ATTR] as T | undefined;
+  const raw = (window as unknown as Record<string, unknown>)[SSR_DATA_ATTR];
+  if (raw === undefined) return undefined;
+  if (validate && !validate(raw)) return undefined;
+  return raw as T;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

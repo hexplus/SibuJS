@@ -45,6 +45,26 @@ export function sanitizeUrl(url: string): string {
 }
 
 /**
+ * Sanitizes a CSS value to prevent data exfiltration via url(), expression(),
+ * or other injection vectors. Strips url() and expression() calls entirely.
+ *
+ * @param value CSS property value to sanitize
+ * @returns The sanitized value, or empty string if dangerous
+ */
+export function sanitizeCSSValue(value: string): string {
+  const lower = value.toLowerCase().replace(/\s+/g, "");
+  if (
+    lower.includes("url(") ||
+    lower.includes("expression(") ||
+    lower.includes("javascript:") ||
+    lower.includes("-moz-binding")
+  ) {
+    return "";
+  }
+  return value;
+}
+
+/**
  * Sanitizes HTML by stripping all tags, leaving only text content.
  *
  * @param html HTML string to strip

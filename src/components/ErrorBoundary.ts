@@ -1,5 +1,8 @@
+import { isDev } from "../core/dev";
 import { button, div, h3, p, span, style } from "../core/rendering/html";
 import { signal } from "../core/signals/signal";
+
+const _isDev = isDev();
 
 export interface ErrorBoundaryProps {
   /**
@@ -142,7 +145,9 @@ export function ErrorBoundary({ nodes, fallback, onError }: ErrorBoundaryProps):
     return errorObj;
   };
 
-  // Default fallback with improved styling
+  // Default fallback with improved styling.
+  // In production, shows a generic message to prevent leaking internal details
+  // (file paths, DB connection strings, stack traces).
   const defaultFallback = (err: Error, retryFn: () => void) =>
     div({
       class: "sibu-error-fallback",
@@ -152,7 +157,7 @@ export function ErrorBoundary({ nodes, fallback, onError }: ErrorBoundaryProps):
           class: "sibu-error-title",
         }) as Element,
         p({
-          nodes: err.message,
+          nodes: _isDev ? err.message : "An unexpected error occurred. Please try again.",
           class: "sibu-error-message",
         }) as Element,
         button({

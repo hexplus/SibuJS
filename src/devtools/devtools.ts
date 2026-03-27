@@ -23,6 +23,7 @@
  * or creates one. Events are buffered until the panel connects.
  */
 
+import { isDev } from "../core/dev";
 import { signal as _sbSignal } from "../core/signals/signal";
 
 // ---------------------------------------------------------------------------
@@ -150,7 +151,9 @@ export function getActiveDevTools(): ReturnType<typeof initDevTools> | null {
  */
 export function initDevTools(config?: DevToolsConfig) {
   const maxEvents = config?.maxEvents ?? 1000;
-  const enabled = config?.enabled ?? true;
+  // Default to enabled only in dev mode — production builds get a no-op API
+  // unless explicitly opted in via { enabled: true }.
+  const enabled = config?.enabled ?? isDev();
   if (!enabled) return createNoopApi();
 
   const hook = getOrCreateHook();

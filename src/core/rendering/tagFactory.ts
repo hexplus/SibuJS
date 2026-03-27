@@ -1,7 +1,7 @@
 import { bindAttribute } from "../../reactivity/bindAttribute";
 import { bindChildNode } from "../../reactivity/bindChildNode";
 import { track } from "../../reactivity/track";
-import { isUrlAttribute, sanitizeUrl } from "../../utils/sanitize";
+import { isUrlAttribute, sanitizeCSSValue, sanitizeUrl } from "../../utils/sanitize";
 import { registerDisposer } from "./dispose";
 import type { NodeChild, NodeChildren } from "./types";
 
@@ -51,11 +51,11 @@ function applyStyle(el: Element, style: TagProps["style"]) {
     if (typeof val === "function") {
       const getter = val as () => string | number;
       const teardown = track(() => {
-        htmlEl.style.setProperty(name, String(getter()));
+        htmlEl.style.setProperty(name, sanitizeCSSValue(String(getter())));
       });
       registerDisposer(el, teardown);
     } else {
-      htmlEl.style.setProperty(name, String(val));
+      htmlEl.style.setProperty(name, sanitizeCSSValue(String(val)));
     }
   }
 }

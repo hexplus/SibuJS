@@ -26,6 +26,21 @@ export interface PersistOptions<T = unknown> {
   deserialize?: (raw: string) => unknown;
   /** Optional type guard to validate deserialized data. Falls back to initial on failure. */
   validate?: (value: unknown) => value is T;
+  /**
+   * Encrypt the serialized value before writing to storage.
+   * Paired with `decrypt` for reading. Use for sensitive data.
+   *
+   * @example
+   * ```ts
+   * persisted("token", "", {
+   *   encrypt: (v) => btoa(v),   // or use Web Crypto API
+   *   decrypt: (v) => atob(v),
+   * });
+   * ```
+   */
+  encrypt?: (value: string) => string;
+  /** Decrypt the stored value before deserialization. Required if `encrypt` is set. */
+  decrypt?: (value: string) => string;
 }
 
 export function persisted<T>(
@@ -36,18 +51,21 @@ export function persisted<T>(
   const storage = options.session ? sessionStorage : localStorage;
   const serialize = options.serialize || JSON.stringify;
   const deserialize = options.deserialize || JSON.parse;
+  const encrypt = options.encrypt;
+  const decrypt = options.decrypt;
 
   // Try to restore persisted value
   let restored = initial;
   try {
-    const raw = storage.getItem(key);
+    let raw = storage.getItem(key);
     if (raw !== null) {
+      if (decrypt) raw = decrypt(raw);
       const parsed = deserialize(raw);
       // If a validate guard is provided, only accept data that passes it
       restored = options.validate && !options.validate(parsed) ? initial : (parsed as T);
     }
   } catch {
-    // If parsing fails, use initial
+    // If parsing or decryption fails, use initial
   }
 
   const [value, setValue] = signal<T>(restored);
@@ -56,7 +74,9 @@ export function persisted<T>(
   effect(() => {
     const current = value();
     try {
-      storage.setItem(key, serialize(current));
+      let serialized = serialize(current);
+      if (encrypt) serialized = encrypt(serialized);
+      storage.setItem(key, serialized);
     } catch {
       // Storage full or unavailable
     }
