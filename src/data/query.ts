@@ -120,8 +120,13 @@ export function query<T>(
   async function doFetch(): Promise<void> {
     if (disposed || !currentKey || !enabled) return;
     const key = currentKey;
-    const entry = queryCache.get(key);
-    if (!entry) return;
+    let entry = queryCache.get(key);
+    if (!entry) {
+      entry = getOrCreateEntry(key);
+      entry.subscribers++;
+      entry.listeners.add(onCacheUpdate);
+      entry.refetchers.add(doFetch);
+    }
 
     // Dedup: another subscriber is already fetching this key — await its result
     if (entry.promise) {
@@ -185,9 +190,16 @@ export function query<T>(
   function onCacheUpdate(): void {
     if (disposed || !currentKey) return;
     const entry = queryCache.get(currentKey);
-    if (!entry) return;
+    if (!entry) {
+      batch(() => {
+        setData(undefined);
+        setError(undefined);
+        setIsFetching(false);
+      });
+      return;
+    }
     batch(() => {
-      if (entry.data !== undefined) setData(entry.data as T);
+      setData(entry.data as T | undefined);
       setError(entry.error);
       if (!entry.promise) setIsFetching(false);
     });
@@ -316,8 +328,16 @@ export function setQueryData<T>(key: string, data: T | ((prev: T | undefined) =>
 
 /** Clear the entire query cache */
 export function clearQueryCache(): void {
+  const activeListeners: Array<() => void> = [];
+  const activeRefetchers: Array<() => Promise<void>> = [];
   for (const entry of queryCache.values()) {
     if (entry.gcTimer) clearTimeout(entry.gcTimer);
+    if (entry.subscribers > 0) {
+      for (const listener of entry.listeners) activeListeners.push(listener);
+      for (const refetcher of entry.refetchers) activeRefetchers.push(refetcher);
+    }
   }
   queryCache.clear();
+  for (const listener of activeListeners) listener();
+  for (const refetcher of activeRefetchers) refetcher();
 }

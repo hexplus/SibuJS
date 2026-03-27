@@ -186,6 +186,21 @@ describe("query", () => {
       q1.dispose();
       q2.dispose();
     });
+
+    it("clearQueryCache resets active query signals and refetches", async () => {
+      let count = 0;
+      const q = query("clear-active", async () => ++count);
+      await tick();
+      expect(q.data()).toBe(1);
+
+      clearQueryCache();
+      // Signals should be reset immediately
+      expect(q.data()).toBe(undefined);
+      // After refetch completes, data should be available again
+      await tick();
+      expect(q.data()).toBe(2);
+      q.dispose();
+    });
   });
 
   describe("refetch", () => {
