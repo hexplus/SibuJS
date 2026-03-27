@@ -14,6 +14,7 @@ export function accordion(options: AccordionOptions): {
   collapse: (id: string) => void;
   expandAll: () => void;
   collapseAll: () => void;
+  isExpanded: (id: string) => boolean;
 } {
   const { items: itemDefs, multiple = false, defaultExpanded = [] } = options;
 

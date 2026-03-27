@@ -12,6 +12,7 @@ export function tabs(options: TabsOptions): {
   tabs: () => Array<{ id: string; label: string; disabled?: boolean; isActive: boolean }>;
   nextTab: () => void;
   prevTab: () => void;
+  isActive: (id: string) => boolean;
 } {
   const { tabs: tabDefs, defaultTab } = options;
 

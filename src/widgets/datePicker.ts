@@ -24,6 +24,7 @@ export function datePicker(options?: DatePickerOptions): {
     isDisabled: boolean;
   }>;
   isDateDisabled: (date: Date) => boolean;
+  isSelected: (date: Date) => boolean;
 } {
   const minDate = options?.minDate;
   const maxDate = options?.maxDate;
