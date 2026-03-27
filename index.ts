@@ -25,6 +25,8 @@ export * from "./src/core/rendering/portal";
 export * from "./src/core/rendering/dynamic";
 export * from "./src/core/rendering/slots";
 export * from "./src/core/rendering/directives";
+export * from "./src/core/rendering/keepAlive";
+export * from "./src/core/rendering/action";
 export * from "./src/core/rendering/catch";
 
 // Disposal (reactive binding cleanup)
@@ -41,6 +43,7 @@ export * from "./src/core/signals/memo";
 export * from "./src/core/signals/memoFn";
 export * from "./src/core/signals/array";
 export * from "./src/core/signals/deepSignal";
+export * from "./src/core/signals/writable";
 
 // Lifecycle & context
 export * from "./src/core/rendering/lifecycle";

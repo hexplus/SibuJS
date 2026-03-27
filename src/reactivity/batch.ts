@@ -12,22 +12,24 @@ const pendingSignals = new Set<ReactiveSignal>();
  * Can be nested — only the outermost batch triggers notifications.
  *
  * @param fn Function containing state updates to batch
+ * @returns The return value of fn
  *
  * @example
  * ```ts
  * const [name, setName] = signal("Alice");
  * const [age, setAge] = signal(25);
  *
- * batch(() => {
+ * const result = batch(() => {
  *   setName("Bob");
  *   setAge(30);
- * }); // Only one notification pass
+ *   return "done";
+ * }); // Only one notification pass, result === "done"
  * ```
  */
-export function batch(fn: () => void): void {
+export function batch<T>(fn: () => T): T {
   batchDepth++;
   try {
-    fn();
+    return fn();
   } finally {
     batchDepth--;
     if (batchDepth === 0) {

@@ -1,4 +1,4 @@
-import { track } from "../../reactivity/track";
+import { track, untracked } from "../../reactivity/track";
 import { devAssert } from "../dev";
 import { isSSR } from "../ssr-context";
 
@@ -9,6 +9,44 @@ export interface EffectOptions {
 }
 
 const _g = globalThis as any;
+
+/**
+ * Creates a callback that only tracks the specified dependencies,
+ * running the handler in an untracked context. Use with `effect()`
+ * to control exactly which signals trigger re-execution.
+ *
+ * @param deps Getter(s) whose return values are tracked as dependencies
+ * @param handler Called with the current dependency value(s) whenever they change
+ * @returns A function suitable for passing to `effect()`
+ *
+ * @example
+ * ```ts
+ * const [count, setCount] = signal(0);
+ * const [label, setLabel] = signal("clicks");
+ *
+ * // Only re-runs when count changes, NOT when label changes
+ * effect(on(() => count(), (c) => {
+ *   console.log(`${c} ${label()}`);  // label() read but not tracked
+ * }));
+ * ```
+ */
+export function on<T>(deps: () => T, handler: (value: T, prev: T | undefined) => void): () => void {
+  let prev: T | undefined;
+  let first = true;
+
+  return () => {
+    const value = deps();
+    if (first) {
+      first = false;
+      prev = value;
+      untracked(() => handler(value, undefined));
+    } else {
+      const p = prev;
+      prev = value;
+      untracked(() => handler(value, p));
+    }
+  };
+}
 
 /**
  * effect runs the provided effectFn immediately and re-runs it whenever
