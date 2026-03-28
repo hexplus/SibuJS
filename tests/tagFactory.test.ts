@@ -54,25 +54,25 @@ describe("tagFactory", () => {
   });
 
   it("should filter false in nodes array (condition && element pattern)", () => {
-    const el = div({ nodes: [false && p({ nodes: "Hidden" }), button({ nodes: "Visible" })] as any[] });
+    const el = div({ nodes: [false && p({ nodes: "Hidden" }), button({ nodes: "Visible" })] });
     expect(el.textContent).toBe("Visible");
     expect(el.querySelectorAll("p").length).toBe(0);
   });
 
   it("should filter true in nodes array", () => {
-    const el = div({ nodes: [true, "Hello"] as any[] });
+    const el = div({ nodes: [true, "Hello"] });
     expect(el.textContent).toBe("Hello");
   });
 
   it("should filter booleans in nested arrays", () => {
-    const el = div({ nodes: [[false, "Text", true]] as any[] });
+    const el = div({ nodes: [[false, "Text", true]] });
     expect(el.textContent).toBe("Text");
   });
 
   it("should handle boolean as sole nodes value", () => {
-    const el = div({ nodes: false as any });
+    const el = div({ nodes: false });
     expect(el.textContent).toBe("");
-    const el2 = div({ nodes: true as any });
+    const el2 = div({ nodes: true });
     expect(el2.textContent).toBe("");
   });
 

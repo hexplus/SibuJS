@@ -274,7 +274,7 @@ describe("query", () => {
       await tick();
       expect(q.data()?.count).toBe(20);
 
-      // Second subscriber with different select still gets its own transform
+      // setQueryData updates raw cache; select is re-applied via onCacheUpdate
       setQueryData("select-cache", { count: 5 });
       expect(q.data()?.count).toBe(10);
       q.dispose();
