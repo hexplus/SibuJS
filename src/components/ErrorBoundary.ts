@@ -283,16 +283,31 @@ export function ErrorBoundary({ nodes, fallback, onError }: ErrorBoundaryProps):
       return div({
         class: "sibu-error-fallback",
         nodes: [
-          div({ class: "sibu-error-header", nodes: [
-            h3({ nodes: "Something went wrong", class: "sibu-error-title" }) as Element,
-          ] }) as Element,
-          div({ class: "sibu-error-body", nodes: [
-            p({ nodes: "An unexpected error occurred. Please try again.", class: "sibu-error-message" }) as Element,
-            div({ class: "sibu-error-actions", nodes: [
-              button({ nodes: "Retry", class: "sibu-error-btn sibu-error-btn-retry", on: { click: retryFn } }) as Element,
-              button({ nodes: "Reload Page", class: "sibu-error-btn sibu-error-btn-reload", on: { click: () => location.reload() } }) as Element,
-            ] }) as Element,
-          ] }) as Element,
+          div({
+            class: "sibu-error-header",
+            nodes: [h3({ nodes: "Something went wrong", class: "sibu-error-title" }) as Element],
+          }) as Element,
+          div({
+            class: "sibu-error-body",
+            nodes: [
+              p({ nodes: "An unexpected error occurred. Please try again.", class: "sibu-error-message" }) as Element,
+              div({
+                class: "sibu-error-actions",
+                nodes: [
+                  button({
+                    nodes: "Retry",
+                    class: "sibu-error-btn sibu-error-btn-retry",
+                    on: { click: retryFn },
+                  }) as Element,
+                  button({
+                    nodes: "Reload Page",
+                    class: "sibu-error-btn sibu-error-btn-reload",
+                    on: { click: () => location.reload() },
+                  }) as Element,
+                ],
+              }) as Element,
+            ],
+          }) as Element,
         ],
       }) as Element;
     }
@@ -308,45 +323,70 @@ export function ErrorBoundary({ nodes, fallback, onError }: ErrorBoundaryProps):
         click: () => {
           navigator.clipboard.writeText(fullText).then(() => {
             (copyBtn as HTMLElement).textContent = "Copied!";
-            setTimeout(() => { (copyBtn as HTMLElement).textContent = "Copy"; }, 1500);
+            setTimeout(() => {
+              (copyBtn as HTMLElement).textContent = "Copy";
+            }, 1500);
           });
         },
       },
     }) as Element;
 
-    const stackLines: Element[] = frames.map((f, i) =>
-      div({ nodes: [
-        span({ class: "sibu-line-num", nodes: String(i + 1) }) as Element,
-        span({ class: "sibu-stack-fn", nodes: f.fn }) as Element,
-        span({ class: "sibu-stack-loc", nodes: ` ${f.loc}` }) as Element,
-      ] }) as Element
+    const stackLines: Element[] = frames.map(
+      (f, i) =>
+        div({
+          nodes: [
+            span({ class: "sibu-line-num", nodes: String(i + 1) }) as Element,
+            span({ class: "sibu-stack-fn", nodes: f.fn }) as Element,
+            span({ class: "sibu-stack-loc", nodes: ` ${f.loc}` }) as Element,
+          ],
+        }) as Element,
     );
 
     return div({
       class: "sibu-error-fallback",
       nodes: [
-        div({ class: "sibu-error-header", nodes: [
-          h3({ nodes: source ? `Error in ${source}` : "Something went wrong", class: "sibu-error-title" }) as Element,
-          ...(source ? [] : [span() as Element]),
-        ] }) as Element,
-        div({ class: "sibu-error-body", nodes: [
-          p({ nodes: err.message, class: "sibu-error-message" }) as Element,
-          ...(frames.length > 0 ? [
-            div({ class: "sibu-error-stack-container", nodes: [
-              div({ class: "sibu-error-stack-label", nodes: [
-                span({ nodes: "Stack Trace" }) as Element,
-                copyBtn,
-              ] }) as Element,
-              div({ class: "sibu-error-stack", nodes: [
-                pre({ nodes: stackLines }) as Element,
-              ] }) as Element,
-            ] }) as Element,
-          ] : []),
-          div({ class: "sibu-error-actions", nodes: [
-            button({ nodes: "Retry", class: "sibu-error-btn sibu-error-btn-retry", on: { click: retryFn } }) as Element,
-            button({ nodes: "Reload Page", class: "sibu-error-btn sibu-error-btn-reload", on: { click: () => location.reload() } }) as Element,
-          ] }) as Element,
-        ] }) as Element,
+        div({
+          class: "sibu-error-header",
+          nodes: [
+            h3({ nodes: source ? `Error in ${source}` : "Something went wrong", class: "sibu-error-title" }) as Element,
+            ...(source ? [] : [span() as Element]),
+          ],
+        }) as Element,
+        div({
+          class: "sibu-error-body",
+          nodes: [
+            p({ nodes: err.message, class: "sibu-error-message" }) as Element,
+            ...(frames.length > 0
+              ? [
+                  div({
+                    class: "sibu-error-stack-container",
+                    nodes: [
+                      div({
+                        class: "sibu-error-stack-label",
+                        nodes: [span({ nodes: "Stack Trace" }) as Element, copyBtn],
+                      }) as Element,
+                      div({ class: "sibu-error-stack", nodes: [pre({ nodes: stackLines }) as Element] }) as Element,
+                    ],
+                  }) as Element,
+                ]
+              : []),
+            div({
+              class: "sibu-error-actions",
+              nodes: [
+                button({
+                  nodes: "Retry",
+                  class: "sibu-error-btn sibu-error-btn-retry",
+                  on: { click: retryFn },
+                }) as Element,
+                button({
+                  nodes: "Reload Page",
+                  class: "sibu-error-btn sibu-error-btn-reload",
+                  on: { click: () => location.reload() },
+                }) as Element,
+              ],
+            }) as Element,
+          ],
+        }) as Element,
       ],
     }) as Element;
   };
