@@ -6,6 +6,8 @@ export type NodeChild =
   | string
   | number
   | boolean
+  // Reactive: pass an Accessor<NodeChild> directly or wrap in an arrow function.
+  // Accessor<T> extends () => T so both forms are covered by this union member.
   | (() => NodeChild)
   | null
   | undefined;
