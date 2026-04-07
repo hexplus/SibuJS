@@ -11,8 +11,4 @@ export type NodeChild =
   | (() => NodeChild)
   | null
   | undefined;
-export type NodeChildren =
-  | NodeChild
-  | NodeChild[]
-  | NodeChild[][]
-  | (() => NodeChild | NodeChild[]);
+export type NodeChildren = NodeChild | NodeChild[] | NodeChild[][] | (() => NodeChild | NodeChild[]);
