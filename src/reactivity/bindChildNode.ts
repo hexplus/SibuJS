@@ -70,7 +70,7 @@ export function bindChildNode(placeholder: Comment, getter: () => NodeChild | No
     // Remove old nodes that are NOT reused
     for (let i = 0; i < lastNodes.length; i++) {
       const node = lastNodes[i];
-      if (reused && reused.has(node)) continue;
+      if (reused?.has(node)) continue;
       if (node.parentNode) node.parentNode.removeChild(node);
     }
 
@@ -80,7 +80,7 @@ export function bindChildNode(placeholder: Comment, getter: () => NodeChild | No
     // Insert new nodes in order, skipping nodes already in the correct position
     for (let i = 0; i < newNodes.length; i++) {
       const node = newNodes[i];
-      if (reused && reused.has(node) && node.parentNode === parent) {
+      if (reused?.has(node) && node.parentNode === parent) {
         // Reused node: only move if not already before the anchor
         if (node.nextSibling !== anchor) {
           parent.insertBefore(node, anchor);

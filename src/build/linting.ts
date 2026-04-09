@@ -268,7 +268,8 @@ export const lintRules = {
           const prevTrimmed = lines[lineIdx - 1].trim();
           if (
             prevTrimmed.includes("sibujs-disable-next-line") &&
-            (prevTrimmed.includes("no-direct-dom-mutation") || !prevTrimmed.includes(" ", prevTrimmed.indexOf("sibujs-disable-next-line") + 25))
+            (prevTrimmed.includes("no-direct-dom-mutation") ||
+              !prevTrimmed.includes(" ", prevTrimmed.indexOf("sibujs-disable-next-line") + 25))
           ) {
             continue;
           }
