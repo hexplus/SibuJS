@@ -30,6 +30,8 @@ export interface FormReturn<T extends Record<string, unknown>> {
   errors: () => Partial<Record<keyof T, string | null>>;
   isValid: () => boolean;
   isDirty: () => boolean;
+  /** True while an async handleSubmit callback is in flight. Prevents double-submit. */
+  submitting: () => boolean;
   touched: () => Partial<Record<keyof T, boolean>>;
   values: () => T;
   handleSubmit: (onSubmit: (values: T) => void | Promise<void>) => (e?: Event) => void;
@@ -161,11 +163,12 @@ export function bindField<T>(field: FormField<T>, extras?: Record<string, unknow
     blur: () => field.touch(),
   };
 
-  // Merge extras.on with field handlers so extras can't accidentally clobber them
+  // Merge extras.on with field handlers — field handlers always win so extras
+  // can't accidentally clobber the value/change/blur wiring.
   const { on: extraOn, value: _ignoreValue, ...restExtras } = (extras ?? {}) as Record<string, unknown>;
   const mergedOn =
     extraOn && typeof extraOn === "object"
-      ? { ...fieldOn, ...(extraOn as Record<string, (e: Event) => void>) }
+      ? { ...(extraOn as Record<string, (e: Event) => void>), ...fieldOn }
       : fieldOn;
 
   return {
@@ -252,15 +255,24 @@ export function form<T extends Record<string, unknown>>(config: FormConfig<T>): 
     return result;
   });
 
+  const [submitting, setSubmitting] = signal(false);
+
   function handleSubmit(onSubmit: (values: T) => void | Promise<void>) {
     return (e?: Event) => {
       if (e) e.preventDefault();
-      // Touch all fields
+      if (submitting()) return;
       for (const field of Object.values(fieldMap) as FormField[]) {
         field.touch();
       }
       if (isValid()) {
-        onSubmit(values());
+        const result = onSubmit(values());
+        if (result && typeof (result as Promise<void>).then === "function") {
+          setSubmitting(true);
+          (result as Promise<void>).then(
+            () => setSubmitting(false),
+            () => setSubmitting(false),
+          );
+        }
       }
     };
   }
@@ -280,6 +292,7 @@ export function form<T extends Record<string, unknown>>(config: FormConfig<T>): 
     errors,
     isValid,
     isDirty,
+    submitting,
     touched: touchedState,
     values,
     handleSubmit,

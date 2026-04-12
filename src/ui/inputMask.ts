@@ -67,13 +67,62 @@ export function inputMask(options: MaskOptions): {
     return raw;
   }
 
+  function isSlot(c: string): boolean {
+    return c === "9" || c === "A" || c === "*";
+  }
+
+  // Build strip regex based on mask slots:
+  // - Pattern has only 9 → keep digits only
+  // - Pattern has only A → keep letters only
+  // - Pattern has * → keep all chars (only strip literal chars from the mask)
+  function buildStripRegex(): RegExp {
+    const hasDigit = options.pattern.includes("9");
+    const hasLetter = options.pattern.includes("A");
+    const hasAny = options.pattern.includes("*");
+    if (hasAny) {
+      // Collect literal chars from the pattern to strip (they're auto-inserted by applyMask)
+      const literals = new Set<string>();
+      for (const c of options.pattern) {
+        if (!isSlot(c)) literals.add(c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+      }
+      return literals.size > 0 ? new RegExp(`[${Array.from(literals).join("")}]`, "g") : /(?!)/g;
+    }
+    if (hasDigit && hasLetter) return /[^a-zA-Z0-9]/g;
+    if (hasDigit) return /[^0-9]/g;
+    if (hasLetter) return /[^a-zA-Z]/g;
+    return /[^a-zA-Z0-9]/g;
+  }
+  const stripRegex = buildStripRegex();
+  const rawCharTest = options.pattern.includes("*") ? () => true : (c: string) => /[a-zA-Z0-9]/.test(c);
+
   function bind(input: HTMLInputElement): void {
     input.addEventListener("input", () => {
-      const raw = input.value.replace(/[^a-zA-Z0-9]/g, "");
+      const cursorBefore = input.selectionStart ?? input.value.length;
+      const oldValue = input.value;
+      const raw = oldValue.replace(stripRegex, "");
       const masked = applyMask(raw);
       setValue(masked);
       setRawValue(extractRaw(masked));
       input.value = masked;
+
+      // Restore cursor: count raw chars before the old cursor, then find
+      // the position in the masked string after that many filled slots.
+      let rawBefore = 0;
+      for (let i = 0; i < cursorBefore && i < oldValue.length; i++) {
+        if (rawCharTest(oldValue[i])) rawBefore++;
+      }
+      let newCursor = 0;
+      let counted = 0;
+      for (; newCursor < masked.length; newCursor++) {
+        if (newCursor < options.pattern.length && isSlot(options.pattern[newCursor])) {
+          counted++;
+          if (counted >= rawBefore) {
+            newCursor++;
+            break;
+          }
+        }
+      }
+      input.setSelectionRange(newCursor, newCursor);
     });
 
     input.addEventListener("focus", () => {

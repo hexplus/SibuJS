@@ -53,7 +53,10 @@ export function mutation<TData, TVariables = void, TContext = unknown>(
   const isSuccess = derived(() => status() === "success");
   const isIdle = derived(() => status() === "idle");
 
+  let runId = 0;
+
   async function execute(variables: TVariables): Promise<TData> {
+    const myRun = ++runId;
     let context: TContext | undefined;
 
     batch(() => {
@@ -69,6 +72,9 @@ export function mutation<TData, TVariables = void, TContext = unknown>(
 
       const result = await withRetry(() => mutationFn(variables), options.retry);
 
+      // Ignore stale responses — a newer mutate() call is in flight
+      if (myRun !== runId) return result;
+
       batch(() => {
         setData(result);
         setLoading(false);
@@ -81,6 +87,9 @@ export function mutation<TData, TVariables = void, TContext = unknown>(
       return result;
     } catch (err) {
       const errorObj = err instanceof Error ? err : new Error(String(err));
+
+      // Ignore stale errors — a newer mutate() call is in flight
+      if (myRun !== runId) throw errorObj;
 
       batch(() => {
         setError(errorObj);
@@ -96,6 +105,7 @@ export function mutation<TData, TVariables = void, TContext = unknown>(
   }
 
   function reset(): void {
+    runId++;
     batch(() => {
       setData(undefined);
       setError(undefined);

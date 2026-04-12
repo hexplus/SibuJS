@@ -1,3 +1,4 @@
+import { registerDisposer } from "../core/rendering/dispose";
 import { signal } from "../core/signals/signal";
 import { track } from "../reactivity/track";
 
@@ -72,7 +73,10 @@ export function FocusTrap(
     const focusable = container.querySelectorAll<HTMLElement>(
       'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
     );
-    if (focusable.length === 0) return;
+    if (focusable.length === 0) {
+      e.preventDefault();
+      return;
+    }
 
     const first = focusable[0];
     const last = focusable[focusable.length - 1];
@@ -99,26 +103,35 @@ export function FocusTrap(
     });
   }
 
-  // Restore focus on removal
+  // Restore focus on removal — observe document.body with subtree so ancestor
+  // removal (not just direct parent removal) is detected.
+  let trapObserver: MutationObserver | null = null;
+
+  function restoreFocusAndCleanup(): void {
+    if (options.restoreFocus !== false) previouslyFocused?.focus();
+    if (trapObserver) {
+      trapObserver.disconnect();
+      trapObserver = null;
+    }
+  }
+
   if (options.restoreFocus !== false) {
-    const observer = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        for (const removed of Array.from(mutation.removedNodes)) {
-          if (removed === container || removed.contains(container)) {
-            previouslyFocused?.focus();
-            observer.disconnect();
-            return;
-          }
-        }
+    trapObserver = new MutationObserver(() => {
+      if (!container.isConnected) {
+        restoreFocusAndCleanup();
       }
     });
 
     queueMicrotask(() => {
-      if (container.parentNode) {
-        observer.observe(container.parentNode, { childList: true });
+      if (container.isConnected) {
+        trapObserver!.observe(document.body, { childList: true, subtree: true });
       }
     });
   }
+
+  // Integrate with dispose() so SPA navigations and when()/match()/each()
+  // clean up the observer even without a DOM removal event.
+  registerDisposer(container, restoreFocusAndCleanup);
 
   return container;
 }
@@ -139,7 +152,6 @@ export function hotkey(
     shift?: boolean;
     alt?: boolean;
     meta?: boolean;
-    global?: boolean;
     preventDefault?: boolean;
   } = {},
 ): () => void {

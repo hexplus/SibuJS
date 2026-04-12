@@ -56,6 +56,7 @@ export function socket(
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   let disposed = false;
+  let manuallyClosed = false;
 
   function getUrl(): string {
     return typeof url === "function" ? url() : url;
@@ -87,12 +88,13 @@ export function socket(
     ws.onclose = () => {
       setStatus("closed");
       stopHeartbeat();
-      if (autoReconnect && !disposed && reconnectCount < maxReconnects) {
+      if (autoReconnect && !disposed && !manuallyClosed && reconnectCount < maxReconnects) {
         reconnectCount++;
         reconnectTimer = setTimeout(() => {
           connect();
         }, reconnectDelay);
       }
+      manuallyClosed = false;
     };
 
     ws.onerror = () => {
@@ -124,6 +126,7 @@ export function socket(
   }
 
   function close(): void {
+    manuallyClosed = true;
     if (reconnectTimer !== null) {
       clearTimeout(reconnectTimer);
       reconnectTimer = null;

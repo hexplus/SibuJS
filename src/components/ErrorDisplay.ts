@@ -404,13 +404,13 @@ function renderMetadata(meta: Record<string, string | number | boolean | null | 
  *
  * @example
  * ```ts
- * button({
- *   on: { click: async () => {
+ * button(
+ *   { on: { click: async () => {
  *     try { await save(); }
  *     catch (err) { mount(ErrorDisplay({ error: err, onRetry: save }), errorHost); }
- *   }},
- *   nodes: "Save",
- * });
+ *   }}},
+ *   "Save",
+ * );
  * ```
  */
 export function ErrorDisplay(props: ErrorDisplayProps): Element {

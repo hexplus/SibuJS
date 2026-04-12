@@ -93,7 +93,7 @@ export function persisted<T>(
   let applyingFromStorage = false;
 
   // Persist on every change
-  effect(() => {
+  const stopPersistEffect = effect(() => {
     const current = value();
     if (applyingFromStorage) return;
     try {
@@ -146,6 +146,7 @@ export function persisted<T>(
   // so. Exposed as a non-enumerable property on the setter to keep the
   // tuple's public shape identical to `signal()`'s return type.
   const dispose = () => {
+    stopPersistEffect();
     if (storageListener && typeof window !== "undefined") {
       window.removeEventListener("storage", storageListener);
       storageListener = null;

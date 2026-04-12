@@ -43,7 +43,7 @@ import { track } from "./track";
  * input({ on: { input: e => setQuery(e.target.value) } });
  *
  * // heavy list reads deferredQuery() and updates one frame later
- * each(() => heavyFilter(items, deferredQuery()), row => li({ nodes: row.name }));
+ * each(() => heavyFilter(items, deferredQuery()), row => li(row.name));
  * ```
  */
 export function defer<T>(getter: () => T): () => T {

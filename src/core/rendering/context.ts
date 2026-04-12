@@ -1,30 +1,32 @@
 import { signal } from "../signals/signal";
 
 /**
- * Context API for SibuJS — provides dependency injection across
- * component trees without prop drilling.
+ * Context API for SibuJS — a reactive global value that any component
+ * can read without prop drilling.
+ *
+ * Note: this is a **global reactive store**, not a subtree-scoped DI
+ * system. Calling `provide()` sets the value for ALL consumers, not
+ * just descendants of the provider. For most apps this is sufficient
+ * — use separate `context()` instances for independent scopes.
  *
  * @example
  * ```ts
  * // Create a context with a default value
  * const ThemeContext = context("light");
  *
- * // Provide a value at a parent level
- * function App() {
- *   ThemeContext.provide("dark");
- *   return div({ nodes: [Child()] });
- * }
+ * // Set the value (global — affects all consumers)
+ * ThemeContext.provide("dark");
  *
- * // Consume the value anywhere below
+ * // Read reactively from any component
  * function Child() {
  *   const theme = ThemeContext.use(); // reactive getter
- *   return div({ nodes: () => `Theme: ${theme()}` });
+ *   return div(() => `Theme: ${theme()}`);
  * }
  * ```
  */
 
 export interface Context<T> {
-  /** Provide a value for this context. Overrides any parent provider. */
+  /** Set the context value globally. Affects all consumers. */
   provide(value: T): void;
   /** Get a reactive getter for the current context value. */
   use(): () => T;

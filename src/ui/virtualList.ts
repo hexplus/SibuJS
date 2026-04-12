@@ -1,3 +1,4 @@
+import { registerDisposer } from "../core/rendering/dispose";
 import { effect } from "../core/signals/effect";
 import { signal } from "../core/signals/signal";
 
@@ -38,9 +39,9 @@ export function VirtualList<T>(props: VirtualListProps<T>): HTMLElement {
   spacer.appendChild(content);
   container.appendChild(spacer);
 
-  container.addEventListener("scroll", () => {
-    setScrollTop(container.scrollTop);
-  });
+  const onScroll = () => setScrollTop(container.scrollTop);
+  container.addEventListener("scroll", onScroll);
+  registerDisposer(container, () => container.removeEventListener("scroll", onScroll));
 
   const update = () => {
     const items = props.items();

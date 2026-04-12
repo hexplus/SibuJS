@@ -49,7 +49,15 @@ export function dispose(node: Node): void {
     const disposers = elementDisposers.get(current);
     if (disposers) {
       if (_isDev) activeBindingCount -= disposers.length;
-      for (const d of disposers) d();
+      for (const d of disposers) {
+        try {
+          d();
+        } catch (err) {
+          if (_isDev && typeof console !== "undefined") {
+            console.warn("[SibuJS] Disposer threw during cleanup:", err);
+          }
+        }
+      }
       elementDisposers.delete(current);
     }
   }

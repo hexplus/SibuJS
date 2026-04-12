@@ -58,7 +58,7 @@ const moduleCache = new Map<string, Promise<unknown>>();
  * const app = createMicroApp({ name: "widget", shadow: true });
  * document.body.appendChild(app.element);
  *
- * app.mount(() => div({ nodes: "Hello from micro-app!" }));
+ * app.mount(() => div("Hello from micro-app!"));
  *
  * // Later, tear it down:
  * app.unmount();

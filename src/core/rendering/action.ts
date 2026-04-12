@@ -25,8 +25,7 @@ export type ActionFn<T = void> = (element: HTMLElement, param: T) => (() => void
  *     action(el, clickOutside, () => setOpen(false));
  *     action(el, longPress, { duration: 500, callback: onLongPress });
  *   },
- *   nodes: "Content",
- * });
+ * }, "Content");
  * ```
  */
 export function action<T>(element: HTMLElement, actionFn: ActionFn<T>, param: T): void;

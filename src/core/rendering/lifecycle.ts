@@ -15,7 +15,7 @@
  *     console.log("Component was removed");
  *   });
  *
- *   return div({ nodes: "Hello" });
+ *   return div("Hello");
  * }
  * ```
  */
@@ -25,12 +25,22 @@ import { registerDisposer } from "./dispose";
 
 type CleanupFn = () => void;
 
-/** Safely invoke a lifecycle callback, catching and logging errors in dev mode. */
-function safeCall(cb: () => unknown, hookName: string): void {
+/** Safely invoke a lifecycle callback, catching and logging errors in dev mode.
+ *  Returns the callback's return value (used to capture onMount cleanup functions). */
+function safeCall(cb: () => unknown, hookName: string): unknown {
   try {
-    cb();
+    return cb();
   } catch (err) {
     devWarn(`${hookName}: callback threw: ${err instanceof Error ? err.message : String(err)}`);
+    return undefined;
+  }
+}
+
+/** Run onMount callback and register returned cleanup function (if any) on the element. */
+function runMountCallback(callback: () => undefined | CleanupFn, hookName: string, element?: HTMLElement): void {
+  const cleanup = safeCall(callback, hookName);
+  if (typeof cleanup === "function" && element) {
+    registerDisposer(element, cleanup as CleanupFn);
   }
 }
 
@@ -52,9 +62,7 @@ export function onMount(callback: () => undefined | CleanupFn, element?: HTMLEle
   if (element) {
     // If element is already connected, run immediately (deferred)
     if (element.isConnected) {
-      queueMicrotask(() => {
-        safeCall(callback, "onMount");
-      });
+      queueMicrotask(() => runMountCallback(callback, "onMount", element));
       return;
     }
 
@@ -62,14 +70,18 @@ export function onMount(callback: () => undefined | CleanupFn, element?: HTMLEle
     const observer = new MutationObserver(() => {
       if (element.isConnected) {
         observer.disconnect();
-        safeCall(callback, "onMount");
+        runMountCallback(callback, "onMount", element);
       }
     });
 
-    // Observe the document body for childList changes (subtree)
+    // Observe the document body for childList changes (subtree).
+    // Register a disposer so the observer is disconnected if the element
+    // is disposed before it ever gets connected (prevents leaked observer).
+    registerDisposer(element, () => observer.disconnect());
+
     queueMicrotask(() => {
       if (element.isConnected) {
-        safeCall(callback, "onMount");
+        runMountCallback(callback, "onMount", element);
       } else {
         observer.observe(document.body, { childList: true, subtree: true });
       }
@@ -90,7 +102,12 @@ export function onMount(callback: () => undefined | CleanupFn, element?: HTMLEle
  * @param element The element to watch for removal
  */
 export function onUnmount(callback: CleanupFn, element: HTMLElement): void {
-  // Wait until element is in the DOM before observing removal
+  // Primary path: use registerDisposer so dispose()/when()/match()/each()
+  // all trigger the callback without needing a MutationObserver.
+  registerDisposer(element, () => safeCall(callback, "onUnmount"));
+
+  // Fallback: MutationObserver for cases where the element is removed from
+  // the DOM without going through dispose() (e.g., manual .remove() calls).
   const startObserving = () => {
     const observer = new MutationObserver(() => {
       if (!element.isConnected) {
@@ -100,12 +117,13 @@ export function onUnmount(callback: CleanupFn, element: HTMLElement): void {
     });
 
     observer.observe(document.body, { childList: true, subtree: true });
+    // Clean up the observer when the element is disposed
+    registerDisposer(element, () => observer.disconnect());
   };
 
   if (element.isConnected) {
     startObserving();
   } else {
-    // Wait for it to be mounted first, then observe for removal
     onMount(() => {
       startObserving();
       return undefined;
@@ -125,7 +143,7 @@ export function onUnmount(callback: CleanupFn, element: HTMLElement): void {
  * ```ts
  * function RealtimeBar(siteId: string) {
  *   const ws = new WebSocket(`/ws/sites/${siteId}/realtime`);
- *   const root = div({ nodes: "Realtime data..." });
+ *   const root = div("Realtime data...");
  *   onCleanup(() => ws.close(), root);
  *   return root;
  * }

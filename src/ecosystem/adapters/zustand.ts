@@ -44,7 +44,7 @@ export interface ZustandAdapterAPI<S> {
  *
  * const zs = inject<ZustandAdapterAPI>("zustand");
  * const bears = zs.useSelector(s => s.bears);
- * div({ nodes: () => `Bears: ${bears()}` });
+ * div(() => `Bears: ${bears()}`);
  * ```
  */
 export function zustandAdapter<S>(options: ZustandAdapterOptions<S>): SibuPlugin {
