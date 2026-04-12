@@ -43,7 +43,7 @@ export function unregisterComponent(name: string): void {
  * @example
  * ```ts
  * registerComponent("Widget", MyWidget);
- * div({ nodes: [resolveComponent("Widget")] });
+ * div([resolveComponent("Widget")]);
  * ```
  */
 export function resolveComponent(name: string): HTMLElement {

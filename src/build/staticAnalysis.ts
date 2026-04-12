@@ -95,7 +95,7 @@ const VOID_ELEMENTS = new Set([
  * converted to template cloning at build time.
  *
  * Detects patterns like:
- *   div({ class: "card", id: "main", nodes: "Hello" })
+ *   div({ class: "card", id: "main" }, "Hello")
  *
  * And identifies them as candidates for:
  *   staticTemplate('<div class="card" id="main">Hello</div>')

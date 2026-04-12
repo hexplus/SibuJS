@@ -294,9 +294,12 @@ class RouteMatcher {
 
   private matchPattern(path: string, routePath: string): { params: Params } | null {
     // Handle wildcard routes
-    if (routePath === "*" || routePath.endsWith("/*")) {
+    if (routePath === "*") {
+      return { params: { pathMatch: path } };
+    }
+    if (routePath.endsWith("/*")) {
       const basePath = routePath.slice(0, -2);
-      if (path.startsWith(basePath)) {
+      if (path === basePath || path.startsWith(`${basePath}/`)) {
         return { params: { pathMatch: path.slice(basePath.length) } };
       }
       return null;
@@ -452,6 +455,8 @@ class GuardManager {
       const next: NavigationNext = (result) => {
         if (resolved || signal.aborted) return;
         resolved = true;
+        clearTimeout(timeoutId);
+        signal.removeEventListener("abort", abortHandler);
 
         if (result instanceof Error) {
           reject(result);
@@ -468,10 +473,10 @@ class GuardManager {
       const abortHandler = () => {
         if (!resolved) {
           resolved = true;
+          clearTimeout(timeoutId);
           reject(new Error("Navigation aborted"));
         }
       };
-      signal.addEventListener("abort", abortHandler);
 
       // Set up timeout
       const timeoutId = setTimeout(() => {
@@ -481,6 +486,8 @@ class GuardManager {
           reject(new Error("Guard timeout"));
         }
       }, this.timeout);
+
+      signal.addEventListener("abort", abortHandler);
 
       try {
         guard(to, from, next);
@@ -493,13 +500,9 @@ class GuardManager {
         }
       }
 
-      // Cleanup when resolved
-      Promise.resolve().then(() => {
-        if (resolved) {
-          clearTimeout(timeoutId);
-          signal.removeEventListener("abort", abortHandler);
-        }
-      });
+      // Note: cleanup (clearTimeout + removeEventListener) happens in the
+      // next() callback, the catch block, the timeout handler, or the abort
+      // handler — whichever resolves the guard first.
     });
   }
 
@@ -1482,11 +1485,11 @@ export function Route(): Node {
  * ```ts
  * // Cache all routes (max 10)
  * createRouter(routes, { keepAlive: 10 });
- * mount(() => div({ nodes: [nav, KeepAliveRoute()] }), root);
+ * mount(() => div([nav, KeepAliveRoute()]), root);
  *
  * // Or cache specific routes by name
  * createRouter(routes, { keepAlive: ["dashboard", "settings"] });
- * mount(() => div({ nodes: [nav, KeepAliveRoute()] }), root);
+ * mount(() => div([nav, KeepAliveRoute()]), root);
  *
  * // Or override per-outlet
  * KeepAliveRoute({ max: 5, include: ["dashboard"] })

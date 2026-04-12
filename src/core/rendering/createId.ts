@@ -16,10 +16,10 @@ let idCounter = 0;
  * ```ts
  * function Field(labelText: string) {
  *   const id = createId("field");
- *   return div({ nodes: [
- *     label({ for: id, nodes: labelText }),
+ *   return div([
+ *     label({ for: id }, labelText),
  *     input({ id }),
- *   ]});
+ *   ]);
  * }
  * ```
  */

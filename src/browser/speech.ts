@@ -23,10 +23,10 @@ export interface SpeakOptions {
  * @example
  * ```ts
  * const tts = speech();
- * button({
- *   nodes: "Read it to me",
- *   on: { click: () => tts.speak("Hello, world!", { rate: 1.1 }) },
- * });
+ * button(
+ *   { on: { click: () => tts.speak("Hello, world!", { rate: 1.1 }) } },
+ *   "Read it to me",
+ * );
  * ```
  */
 export function speech(): {

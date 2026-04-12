@@ -1,4 +1,3 @@
-import { signal } from "../signals/signal";
 import { div, span } from "./html";
 
 type Component = () => HTMLElement;
@@ -16,7 +15,7 @@ type LazyImport = () => Promise<{ default: Component }>;
  * // Use inside Suspense for custom loading UI
  * Suspense({
  *   nodes: () => LazyDashboard(),
- *   fallback: () => div({ nodes: "Loading dashboard..." }),
+ *   fallback: () => div("Loading dashboard..."),
  * });
  *
  * // Or use standalone — shows default "Loading..." text
@@ -35,31 +34,31 @@ export function lazy(importFn: LazyImport): Component {
       return cached();
     }
 
-    const [_status, setStatus] = signal<"loading" | "loaded" | "error">("loading");
-    const [_error, setError] = signal<Error | null>(null);
     const container = div({ class: "sibu-lazy" }) as HTMLElement;
+    let disposed = false;
 
     importFn()
       .then((mod) => {
+        if (disposed) return;
         cached = mod.default;
         const rendered = cached();
         container.replaceChildren(rendered);
-        setStatus("loaded");
       })
       .catch((err) => {
+        if (disposed) return;
         const errorObj = err instanceof Error ? err : new Error(String(err));
-        setError(errorObj);
-        setStatus("error");
-        container.replaceChildren(
-          div({
-            class: "sibu-lazy-error",
-            nodes: `Failed to load component: ${errorObj.message}`,
-          }),
-        );
+        container.replaceChildren(div("sibu-lazy-error", `Failed to load component: ${errorObj.message}`));
       });
 
     // Show loading placeholder initially
-    container.appendChild(span({ class: "sibu-lazy-loading", nodes: "Loading..." }));
+    container.appendChild(span("sibu-lazy-loading", "Loading...") as Node);
+
+    // Guard against stale loads if container is disposed before import resolves
+    const origRemove = container.remove.bind(container);
+    container.remove = () => {
+      disposed = true;
+      origRemove();
+    };
 
     return container;
   };
@@ -72,7 +71,7 @@ export function lazy(importFn: LazyImport): Component {
  * ```ts
  * Suspense({
  *   nodes: () => LazyChart(),
- *   fallback: () => div({ nodes: "Loading chart..." }),
+ *   fallback: () => div("Loading chart..."),
  * });
  * ```
  *

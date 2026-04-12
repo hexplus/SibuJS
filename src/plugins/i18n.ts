@@ -43,14 +43,12 @@ export function t(key: string, params?: Params): string {
  * registerTranslations("en", { greeting: "Hello, {name}!" });
  * registerTranslations("es", { greeting: "Hola, {name}!" });
  *
- * div({ nodes: [Trans("greeting", { name: "World" })] });
+ * div([Trans("greeting", { name: "World" })]);
  * // When locale changes, the text updates automatically
  * ```
  */
 export function Trans(key: string, params?: Params): HTMLElement {
-  return span({
-    nodes: () => t(key, params),
-  }) as HTMLElement;
+  return span(() => t(key, params)) as HTMLElement;
 }
 
 /**

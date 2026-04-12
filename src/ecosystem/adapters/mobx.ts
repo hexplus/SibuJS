@@ -55,7 +55,7 @@ export interface MobXAdapterAPI {
  *
  * const mobx = inject<MobXAdapterAPI>("mobx");
  * const todoCount = mobx.fromMobX(() => todoStore.todos.length);
- * div({ nodes: () => `Todos: ${todoCount()}` });
+ * div(() => `Todos: ${todoCount()}`);
  * ```
  */
 export function mobXAdapter(options: MobXAdapterOptions): SibuPlugin {

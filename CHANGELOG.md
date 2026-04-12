@@ -6,6 +6,103 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.5.0] — 2026-04-11
+
+Comprehensive bug-fix and hardening release. **30 bugs fixed across 29 files**, covering the reactive core, data fetching, state management, routing, rendering, lifecycle, forms, UI utilities, browser composables, and devtools. Full framework audit with 2178/2178 tests passing, zero regressions.
+
+### Breaking
+
+- **`optimistic()` return shape changed** — previously returned a `[getter, setter]` tuple; now returns a named object `{ value, pending, update }`. The `pending` signal was created internally but never exposed (Bug: users had no way to show loading indicators). The `update` method now uses a version counter to prevent stale reverts from concurrent operations. Migration:
+  ```ts
+  // before
+  const [value, addOptimistic] = optimistic(0);
+
+  // after
+  const { value, pending, update } = optimistic(0);
+  ```
+
+- **`optimisticList()` method names shortened** — `addOptimistic` → `add`, `removeOptimistic` → `remove`, `updateOptimistic` → `update`. The old names are kept as deprecated aliases so existing code keeps working.
+
+### Fixed — Core Reactivity
+
+- **`deepEqual` shared-reference false positive** — the `seen` set tracked only `a`, not `(a, b)` pairs. Shared sub-objects compared against different partners were incorrectly treated as equal. Now tracks `Map<object, Set<object>>` pairs.
+- **`deepEqual` constructor mismatch** — `deepEqual(new Date(), {})` returned `true` because Date has no enumerable keys. Added constructor guard before falling through to key comparison.
+- **`deepEqual` Map/Set not compared** — `Map` and `Set` contents were invisible to `Object.keys`. Added explicit Map (deep value equality) and Set (shallow membership) branches, plus ArrayBuffer and TypedArray support.
+- **`deepEqual` self-referential Map/Set** — cycle detection was placed after the Map/Set branches, causing infinite recursion on self-referential containers. Moved cycle detection before all container comparisons.
+- **`derived` circular dependency** — circular derived chains caused silent stack overflow. Added an `evaluating` re-entrance flag that throws a clear `"Circular dependency detected"` error with the signal's debug name.
+- **`drainNotificationQueue` infinite loop** — an effect writing to a signal it reads could loop forever. Added a `MAX_DRAIN_ITERATIONS = 1000` cap with a console error diagnostic.
+- **`deferredValue` never updated** — had no reactive subscription on the source getter (no `effect`/`track`). Rewrote to use `effect()` for source tracking, scheduling LOW-priority updates via the scheduler.
+
+### Fixed — Data Fetching
+
+- **`resource.abort()` left `loading()` stuck at `true`** — the `AbortError` catch returned without resetting the loading signal. Now calls `setLoading(false)` in the abort path.
+- **`query` subscriber leak on same-key re-run** — effect re-runs with an unchanged key double-counted `entry.subscribers`, preventing cache GC. Now only increments when the key actually changed or the entry has zero subscribers.
+- **`mutation` concurrent state clobbering** — rapid `mutate()` calls raced without guard. Added a `runId` version counter; stale responses are silently ignored.
+- **`withRetry` abort listener leak** — the `abort` event listener on `AbortSignal` was never removed when the delay timer resolved normally. Added `removeEventListener` in the timer resolve path.
+
+### Fixed — State Patterns
+
+- **`optimistic` concurrent stale reverts** — each operation now gets a version number; reverts only fire if no newer operation has started. Prevents stale snapshots from overwriting fresher optimistic state.
+- **`optimistic` `pending` never exposed** — the `pending` signal was created but never returned. Now exposed in the return object for both `optimistic` and `optimisticList`.
+- **`optimisticList.updateOptimistic` predicate failure after patch** — the success-path predicate re-ran against the already-mutated item. If the patch changed the matched property, the server result was silently dropped. Now captures patched references during the optimistic phase and matches by identity in the success path.
+- **`persisted` effect not stopped by `dispose()`** — the persisting effect's return value was discarded, so `dispose()` only removed the storage listener but left the effect running. Now captured and called in `dispose()`.
+- **`globalStore` shallow initial copy** — `reset()` could fail to fully restore nested objects if they were mutated in-place. Changed to `JSON.parse(JSON.stringify(...))` for a deep copy of initial state.
+
+### Fixed — Routing
+
+- **Wildcard route too permissive** — `/admin/*` incorrectly matched `/admin-panel` because the check used `path.startsWith(basePath)` without a segment boundary. Now requires `path === basePath || path.startsWith(basePath + "/")`.
+- **Guard timeout/abort listener leak** — when `next()` was called asynchronously, the microtask-based cleanup had already run and missed it. Moved `clearTimeout` + `removeEventListener` into the `next()` callback itself. The abort handler now also clears the timeout timer.
+
+### Fixed — Rendering & Lifecycle
+
+- **`dispose()` one throwing disposer aborted entire subtree cleanup** — wrapped each disposer call in try/catch with a dev-mode warning.
+- **`onMount` cleanup return discarded** — the type signature accepted a cleanup return function but `safeCall` discarded it. Now captured and registered via `registerDisposer(element, cleanup)`.
+- **`onMount` MutationObserver leaked** — if an element was disposed before ever connecting to the DOM, the observer on `document.body` ran forever. Now registered for cleanup via `registerDisposer`.
+- **`onUnmount` observer ran for element's entire lifetime** — the MutationObserver on `document.body` fired on every DOM mutation globally. Now registered for cleanup via `registerDisposer` and the callback itself is also wired through `registerDisposer` as the primary teardown path.
+- **`Portal` cleanup via MutationObserver only** — didn't integrate with `dispose()`/`when()`/`match()`/`each()`. Replaced with `registerDisposer(anchor, ...)` so portal content is properly disposed and removed through the standard dispose system.
+- **`lazy` stale load** — if the container was removed before the dynamic import resolved, the rendered component leaked subscriptions. Added a `disposed` guard that silently drops stale `.then()`/`.catch()` callbacks. Removed dead `_status`/`_error` signals that were created but never read.
+
+### Fixed — UI Utilities
+
+- **`bindField` merge order** — `{...fieldOn, ...extraOn}` let extras clobber field handlers (input/change/blur). Contradicted the 1.0.4 fix intent. Flipped to `{...extraOn, ...fieldOn}` so field handlers always win.
+- **`form.handleSubmit` double-submit** — no guard against concurrent async submissions. Added a `submitting` signal; `handleSubmit` checks it before calling the callback and resets on resolve/reject. Exposed as `form.submitting()` on `FormReturn`.
+- **`inputMask` cursor jump** — no cursor position restoration after mask application; cursor jumped to end on every keystroke. Added cursor tracking that counts raw chars before the old cursor position and places the cursor after that many filled slots in the masked output.
+- **`inputMask` strip regex too aggressive** — `/[^a-zA-Z0-9]/g` stripped all special characters, making `*` mask slots unable to accept non-alphanumeric input. Now builds a pattern-aware strip regex: patterns with `*` only strip literal mask characters.
+- **`transition` rapid enter/leave** — stale `setTimeout` callbacks from a previous enter/leave fired during the opposite animation, corrupting class state. Added `activeTimer` tracking with `cancelPending()` at the start of each enter/leave.
+- **`scopedStyle` pseudo-element scoping** — scope attribute was appended after `::before`/`::after` pseudo-elements, producing invalid CSS selectors. Now splits at `::` and inserts `[attr]` before the pseudo-element.
+- **`VirtualList` scroll listener leak** — the scroll event listener was never cleaned up. Added `registerDisposer` with `removeEventListener`.
+- **`dialog` no dispose** — the global keydown listener leaked if the dialog was open when the component was destroyed. Added `dispose()` method that detaches the listener and resets state.
+- **`FocusTrap` observer scope** — MutationObserver watched only the direct parent; ancestor removal leaked the observer and missed focus restore. Changed to `document.body` with `subtree: true`. Added `registerDisposer` integration for SPA cleanup. Zero-focusable-elements case now calls `e.preventDefault()` to prevent Tab from escaping the trap.
+
+### Fixed — Browser Composables
+
+- **`urlState` missing `hashchange` listener** — anchor clicks and `location.hash` assignments don't fire `popstate`, so `hash()` went stale. Added `hashchange` listener alongside `popstate`. Added deduplication guard to avoid unnecessary signal notifications. `setHash("#")` now clears the hash instead of keeping a bare `#`.
+- **`scroll` non-reactive target** — the scroll target element was resolved once at creation and never re-evaluated. Rewrote to use `effect()` for reactive target tracking, re-attaching the listener when the element changes (same pattern as `resize`/`dragDrop`).
+- **`socket.close()` auto-reconnected** — the `onclose` handler couldn't distinguish manual close from unexpected disconnect. Added a `manuallyClosed` flag set in `close()` and checked in `onclose` to suppress auto-reconnect.
+
+### Fixed — DevTools
+
+- **`createTraceProfiler` subscribed to non-existent events** — listened for `effect:start`/`effect:end`/`signal:set` but the core emits `effect:create`/`effect:destroy`/`signal:update`. Fixed event names and changed to instant (`"I"`) events since the core doesn't emit begin/end pairs.
+
+### Changed
+
+- **`optimistic()` returns a named object** — `{ value, pending, update }` instead of `[getter, setter]`. See Breaking section.
+- **`optimisticList()` shorter method names** — `add`/`remove`/`update` with deprecated `addOptimistic`/`removeOptimistic`/`updateOptimistic` aliases.
+- **`deepSignal` return type** — now infers from `signal()` directly, preserving the `Accessor<T>` brand on the getter.
+- **`hotkey` `global` option removed** — was declared but never used (dead code).
+- **`context` JSDoc updated** — accurately describes global reactive store semantics instead of falsely promising subtree-scoped DI.
+- **JSDoc examples across 17 source files** — ~35 code examples converted from legacy `{ nodes: }` form to canonical positional shorthand.
+- **README** — updated to canonical shorthand authoring style; `$(pattern matching)$` typo fixed.
+
+### Tests
+
+- **`deepSignal.test.ts`** — expanded from 4 → 52 tests covering Map, Set, TypedArray, shared refs, cycles, constructor mismatch.
+- **`urlState.test.ts`** — expanded from 6 → 20 tests covering hashchange, dedup, edge cases, SSR.
+- **`optimistic.test.ts`** — expanded from 5 → 17 tests covering pending, concurrent guards, predicate-after-mutation.
+- Full suite: **2178 / 2178 passing** (up from 2105 in 1.4.0). Zero regressions.
+
+---
+
 ## [1.4.0] — 2026-04-11
 
 Cleanup release. Removes six public aliases that contradicted the SibuJS philosophy — plain verbs, no framework ceremony, no redundant synonyms for the same primitive. All of the removed APIs were either one-line forwards to an existing primitive or identity wrappers; every existing example can be rewritten by deleting the wrapper and calling the underlying primitive directly.

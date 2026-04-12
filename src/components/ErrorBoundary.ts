@@ -29,7 +29,7 @@ export interface ErrorBoundaryProps {
    * const [route, setRoute] = signal("/");
    * ErrorBoundary({
    *   resetKeys: [route],
-   *   nodes: () => div({ nodes: riskyPageFor(route()) }),
+   *   nodes: () => div(riskyPageFor(route())),
    * });
    * ```
    */

@@ -11,10 +11,10 @@ import { signal } from "../core/signals/signal";
  * @example
  * ```ts
  * const fs = fullscreen();
- * button({
- *   nodes: () => (fs.isFullscreen() ? "Exit fullscreen" : "Enter fullscreen"),
- *   on: { click: () => fs.toggle(videoEl) },
- * });
+ * button(
+ *   { on: { click: () => fs.toggle(videoEl) } },
+ *   () => (fs.isFullscreen() ? "Exit fullscreen" : "Enter fullscreen"),
+ * );
  * ```
  */
 export function fullscreen(): {

@@ -2,6 +2,7 @@
 // CONCURRENT RENDERING UTILITIES
 // ============================================================================
 
+import { effect } from "../core/signals/effect";
 import { signal } from "../core/signals/signal";
 import { Priority, scheduleUpdate } from "./scheduler";
 
@@ -19,27 +20,22 @@ export function startTransition(callback: () => void): void {
  * The deferred value mirrors the source but updates at LOW priority,
  * allowing the UI to remain responsive while expensive derived state
  * catches up.
+ *
+ * Uses an effect to subscribe to the source getter. When the source
+ * changes, a LOW-priority update is scheduled. The deferred signal
+ * only updates when the scheduler flushes, so fast bursts of source
+ * changes collapse into a single deferred update.
  */
 export function deferredValue<T>(getter: () => T): () => T {
   const [deferred, setDeferred] = signal<T>(getter());
+  let latest: T = deferred();
 
-  // Schedule a LOW-priority update that syncs the deferred value
-  // with the latest source value whenever it is called.
-  const sync = (): void => {
-    const current = getter();
-    setDeferred(current);
-  };
+  effect(() => {
+    latest = getter();
+    scheduleUpdate(Priority.LOW, () => setDeferred(latest));
+  });
 
-  // Kick off the initial deferred sync
-  scheduleUpdate(Priority.LOW, sync);
-
-  // Return a getter that, each time it's read, also enqueues a
-  // LOW-priority re-sync so the deferred value eventually converges
-  // with the source.
-  return (): T => {
-    scheduleUpdate(Priority.LOW, sync);
-    return deferred();
-  };
+  return deferred;
 }
 
 /**
@@ -105,7 +101,7 @@ export function setIdPrefix(prefix: string): void {
  * @example
  * ```ts
  * const id = id();
- * label({ htmlFor: id, nodes: "Name" });
+ * label({ htmlFor: id }, "Name");
  * input({ id, type: "text" });
  * ```
  */

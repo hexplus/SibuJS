@@ -182,12 +182,23 @@ export function queueSignalNotification(signal: ReactiveSignal): void {
 /**
  * Process all pending subscriber notifications.
  */
+const MAX_DRAIN_ITERATIONS = 1000;
+
 export function drainNotificationQueue(): void {
   if (notifyDepth > 0) return;
   notifyDepth++;
   try {
     let i = 0;
     while (i < pendingQueue.length) {
+      if (i >= MAX_DRAIN_ITERATIONS) {
+        if (typeof console !== "undefined") {
+          console.error(
+            `[SibuJS] Notification queue exceeded ${MAX_DRAIN_ITERATIONS} iterations — ` +
+              "likely an effect that writes to a signal it reads. Breaking to prevent infinite loop.",
+          );
+        }
+        break;
+      }
       safeInvoke(pendingQueue[i]);
       i++;
     }

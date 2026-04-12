@@ -28,7 +28,7 @@ export function globalStore<
   S extends Record<string, unknown>,
   A extends Record<string, (state: S, payload?: unknown) => Partial<S>>,
 >(config: { state: S; actions: A; middleware?: Middleware<S>[] }): GlobalStore<S, A> {
-  const initialState = { ...config.state };
+  const initialState = JSON.parse(JSON.stringify(config.state)) as S;
   const [getState, setState] = signal<S>({ ...initialState });
   const listeners: Set<(state: S) => void> = new Set();
   const middlewares = config.middleware || [];

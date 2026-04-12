@@ -90,9 +90,13 @@ export async function withRetry<T>(
       const delay = calculateDelay(attempt, strategy, baseDelay, maxDelay, jitter);
       onRetry?.(error, attempt, delay);
       await new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(resolve, delay);
+        let onAbort: (() => void) | null = null;
+        const timer = setTimeout(() => {
+          if (onAbort && signal) signal.removeEventListener("abort", onAbort);
+          resolve();
+        }, delay);
         if (signal) {
-          const onAbort = () => {
+          onAbort = () => {
             clearTimeout(timer);
             reject(new DOMException("Aborted", "AbortError"));
           };

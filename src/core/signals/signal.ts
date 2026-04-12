@@ -13,9 +13,9 @@ declare const __accessor: unique symbol;
  * ```ts
  * const [count, setCount] = signal(0);
  *
- * div({ nodes: count })           // ✓ reactive — Accessor passed directly
- * div({ nodes: () => count() })   // ✓ reactive — explicit arrow wrapper
- * div({ nodes: count() })         // ✗ static  — evaluated once, not reactive
+ * div(count)                       // ✓ reactive — Accessor passed directly
+ * div(() => count())               // ✓ reactive — explicit arrow wrapper
+ * div(count())                     // ✗ static  — evaluated once, not reactive
  * ```
  */
 export type Accessor<T> = (() => T) & { readonly [__accessor]?: never };

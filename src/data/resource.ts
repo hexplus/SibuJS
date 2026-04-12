@@ -123,7 +123,10 @@ export function resource<T, S = void>(
       options.onSuccess?.(result);
     } catch (err) {
       if (version !== fetchVersion || disposed) return;
-      if (err instanceof DOMException && err.name === "AbortError") return;
+      if (err instanceof DOMException && err.name === "AbortError") {
+        if (version === fetchVersion) setLoading(false);
+        return;
+      }
 
       const errorObj = err instanceof Error ? err : new Error(String(err));
       batch(() => {

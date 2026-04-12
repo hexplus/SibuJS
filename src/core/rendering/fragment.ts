@@ -6,14 +6,12 @@ import type { NodeChildren } from "./types";
  *
  * @example
  * ```ts
- * div({
- *   nodes: [
- *     Fragment([
- *       p({ nodes: "First" }),
- *       p({ nodes: "Second" }),
- *     ])
- *   ]
- * });
+ * div([
+ *   Fragment([
+ *     p("First"),
+ *     p("Second"),
+ *   ])
+ * ]);
  * ```
  *
  * @param nodes Array of child nodes to include in the fragment

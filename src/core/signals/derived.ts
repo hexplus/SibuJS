@@ -36,13 +36,25 @@ export function derived<T>(getter: () => T, options?: { name?: string }): Access
   // DevTools: emit computed:create
   const hook = (globalThis as any).__SIBU_DEVTOOLS_GLOBAL_HOOK__;
 
+  let evaluating = false;
+
   function computedGetter(): T {
+    if (evaluating) {
+      throw new Error(
+        `[SibuJS] Circular dependency detected in derived${debugName ? ` "${debugName}"` : ""}. ` +
+          "A derived signal cannot read itself (directly or through a chain).",
+      );
+    }
+
     if (trackingSuspended) {
-      // Called during another derived's re-evaluation (propagateDirty eager path).
-      // Re-evaluate if dirty but don't re-track (we're inside suspended context).
       if (cs._d) {
-        cs._d = false;
-        cs._v = getter();
+        evaluating = true;
+        try {
+          cs._d = false;
+          cs._v = getter();
+        } finally {
+          evaluating = false;
+        }
       }
       return cs._v;
     }
@@ -53,14 +65,15 @@ export function derived<T>(getter: () => T, options?: { name?: string }): Access
     if (cs._d) {
       const oldValue = cs._v;
 
-      // Re-evaluate AND re-track dependencies.
-      // This is the key fix: track() cleans old deps and registers new ones,
-      // so derived-of-derived chains (e.g. F6=SUM(F2:F4) where F2 is also
-      // a formula) always have up-to-date dependency links.
-      track(() => {
-        cs._d = false;
-        cs._v = getter();
-      }, markDirty);
+      evaluating = true;
+      try {
+        track(() => {
+          cs._d = false;
+          cs._v = getter();
+        }, markDirty);
+      } finally {
+        evaluating = false;
+      }
 
       // DevTools: emit computed recomputation
       if (hook && oldValue !== cs._v) {

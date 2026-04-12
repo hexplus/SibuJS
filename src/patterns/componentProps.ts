@@ -45,11 +45,10 @@ type WithNodes<Props> = Props & { nodes?: Node | Node[] };
  * const Button = defineComponent<{ label: string; variant?: 'primary' | 'secondary'; disabled?: boolean }>({
  *   defaults: { variant: 'primary', disabled: false },
  *   setup(props) {
- *     return button({
- *       class: `btn btn-${props.variant}`,
- *       disabled: props.disabled,
- *       nodes: props.label
- *     });
+ *     return button(
+ *       { class: `btn btn-${props.variant}`, disabled: props.disabled },
+ *       props.label,
+ *     );
  *   }
  * });
  *
@@ -88,7 +87,7 @@ export function defineComponent<Props extends Record<string, unknown>>(config: {
  * const Card = defineSlottedComponent<{ title: string }>({
  *   setup(props) {
  *     const el = div({ class: 'card' });
- *     el.appendChild(h2({ nodes: props.title }));
+ *     el.appendChild(h2(props.title));
  *     if (props.nodes) {
  *       const nodes = Array.isArray(props.nodes) ? props.nodes : [props.nodes];
  *       nodes.forEach(child => el.appendChild(child));
@@ -97,7 +96,7 @@ export function defineComponent<Props extends Record<string, unknown>>(config: {
  *   }
  * });
  *
- * // Usage: Card({ title: 'Hello', nodes: p({ nodes: 'World' }) })
+ * // Usage: Card({ title: 'Hello', nodes: p('World') })
  * ```
  */
 export function defineSlottedComponent<Props extends Record<string, unknown>>(config: {

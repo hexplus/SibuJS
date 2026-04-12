@@ -34,7 +34,7 @@ export interface TransitionOptions {
  *
  * @example
  * ```ts
- * const box = div({ class: "box", nodes: "Hello" });
+ * const box = div("box", "Hello");
  * const { enter, leave } = transition(box, {
  *   duration: 300,
  *   enterClass: "fade-in",
@@ -62,9 +62,18 @@ export function transition(
   } = options;
 
   const transitionValue = `${property} ${duration}ms ${easing} ${delay}ms`;
+  let activeTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function cancelPending(): void {
+    if (activeTimer !== null) {
+      clearTimeout(activeTimer);
+      activeTimer = null;
+    }
+  }
 
   function enter(): Promise<void> {
     return new Promise<void>((resolve) => {
+      cancelPending();
       element.style.transition = transitionValue;
 
       if (enterClass) element.classList.add(enterClass);
@@ -76,13 +85,14 @@ export function transition(
       if (activeClass) element.classList.add(activeClass);
 
       const done = () => {
+        activeTimer = null;
         if (enterClass) element.classList.remove(enterClass);
         onEnterDone?.();
         resolve();
       };
 
       if (duration > 0) {
-        setTimeout(done, duration + delay);
+        activeTimer = setTimeout(done, duration + delay);
       } else {
         done();
       }
@@ -91,6 +101,7 @@ export function transition(
 
   function leave(): Promise<void> {
     return new Promise<void>((resolve) => {
+      cancelPending();
       element.style.transition = transitionValue;
 
       if (activeClass) element.classList.remove(activeClass);
@@ -98,13 +109,14 @@ export function transition(
       if (enterClass) element.classList.remove(enterClass);
 
       const done = () => {
+        activeTimer = null;
         if (leaveClass) element.classList.remove(leaveClass);
         onLeaveDone?.();
         resolve();
       };
 
       if (duration > 0) {
-        setTimeout(done, duration + delay);
+        activeTimer = setTimeout(done, duration + delay);
       } else {
         done();
       }

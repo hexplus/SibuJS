@@ -37,7 +37,7 @@ export function withWrapper<P>(
  * @example
  * ```ts
  * const Button = withDefaults(RawButton, { type: "button", disabled: false });
- * Button({ nodes: "Click" }); // type="button", disabled=false automatically
+ * Button("Click"); // type="button", disabled=false automatically
  * ```
  */
 export function withDefaults<P extends Record<string, unknown>>(

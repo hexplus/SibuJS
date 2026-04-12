@@ -1,6 +1,12 @@
+import { dispose, registerDisposer } from "./dispose";
+
 /**
  * Portal renders nodes into a DOM node outside the parent component hierarchy.
  * Useful for modals, tooltips, dropdowns, and overlays.
+ *
+ * Cleanup integrates with `dispose()` / `registerDisposer()` so portals
+ * are properly torn down when the anchor is disposed by `when()`, `match()`,
+ * `each()`, or manual `dispose(anchor)`.
  *
  * @param nodes Function that returns the content to render
  * @param target Target DOM element (defaults to document.body)
@@ -9,11 +15,11 @@
  * @example
  * ```ts
  * // Render modal at document.body
- * Portal(() => div({ class: "modal", nodes: "Modal content" }));
+ * Portal(() => div("modal", "Modal content"));
  *
  * // Render into specific container
  * const overlay = document.getElementById("overlay-root")!;
- * Portal(() => div({ nodes: "Tooltip" }), overlay);
+ * Portal(() => div("Tooltip"), overlay);
  * ```
  */
 export function Portal(nodes: () => HTMLElement, target?: HTMLElement): Comment {
@@ -26,22 +32,19 @@ export function Portal(nodes: () => HTMLElement, target?: HTMLElement): Comment 
       portalContent = nodes();
       container.appendChild(portalContent);
     } catch (err) {
-      console.error("[Portal] Render error:", err);
+      if (typeof console !== "undefined") {
+        console.error("[Portal] Render error:", err);
+      }
     }
   });
 
-  // Cleanup when anchor is removed from DOM
-  const observer = new MutationObserver(() => {
-    if (!anchor.isConnected && portalContent) {
+  // Primary cleanup: registerDisposer on the anchor so `dispose()`,
+  // `when()`, `match()`, and `each()` all clean up portal content.
+  registerDisposer(anchor as unknown as HTMLElement, () => {
+    if (portalContent) {
+      dispose(portalContent);
       portalContent.remove();
       portalContent = null;
-      observer.disconnect();
-    }
-  });
-
-  queueMicrotask(() => {
-    if (anchor.parentNode) {
-      observer.observe(anchor.parentNode, { childList: true });
     }
   });
 
