@@ -43,7 +43,7 @@ export interface ReduxAdapterAPI<S = unknown> {
  *
  * const redux = inject<ReduxAdapterAPI>("redux");
  * const count = redux.useSelector(s => s.counter);
- * div({ nodes: () => `Count: ${count()}` });
+ * div(() => `Count: ${count()}`);
  * ```
  */
 export function reduxAdapter<S>(options: ReduxAdapterOptions<S>): SibuPlugin {

@@ -1,3 +1,4 @@
+import { effect } from "../core/signals/effect";
 import { signal } from "../core/signals/signal";
 import { batch } from "../reactivity/batch";
 
@@ -5,6 +6,9 @@ import { batch } from "../reactivity/batch";
  * scroll tracks the scroll position of a target element or the window.
  * Returns reactive x/y scroll positions and an isScrolling indicator
  * that resets after 150ms of inactivity.
+ *
+ * If a reactive target getter is provided, the listener re-attaches
+ * whenever the target element changes (same pattern as resize/dragDrop).
  *
  * @param target Optional reactive getter for the scroll target element.
  *               If omitted or returns null, tracks window scroll.
@@ -20,6 +24,8 @@ export function scroll(target?: () => HTMLElement | null): {
   const [y, setY] = signal(0);
   const [isScrolling, setIsScrolling] = signal(false);
   let scrollTimer: ReturnType<typeof setTimeout> | null = null;
+  let currentTarget: EventTarget | null = null;
+  let effectCleanup: (() => void) | null = null;
 
   if (typeof window === "undefined") {
     return { x, y, isScrolling, dispose: () => {} };
@@ -45,12 +51,29 @@ export function scroll(target?: () => HTMLElement | null): {
     }, 150);
   };
 
-  const scrollTarget = target ? target() : null;
-  const eventTarget = scrollTarget || window;
-  eventTarget.addEventListener("scroll", handler, { passive: true });
+  function attachListener(eventTarget: EventTarget): void {
+    if (currentTarget === eventTarget) return;
+    if (currentTarget) currentTarget.removeEventListener("scroll", handler);
+    currentTarget = eventTarget;
+    currentTarget.addEventListener("scroll", handler, { passive: true });
+  }
+
+  if (target) {
+    // Reactive target — re-attach listener when element changes
+    effectCleanup = effect(() => {
+      const el = target();
+      attachListener(el || window);
+    });
+  } else {
+    attachListener(window);
+  }
 
   function dispose() {
-    eventTarget.removeEventListener("scroll", handler);
+    effectCleanup?.();
+    if (currentTarget) {
+      currentTarget.removeEventListener("scroll", handler);
+      currentTarget = null;
+    }
     if (scrollTimer !== null) {
       clearTimeout(scrollTimer);
       scrollTimer = null;

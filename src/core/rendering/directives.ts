@@ -13,7 +13,7 @@ import type { NodeChild } from "./types";
  * @example
  * ```ts
  * const [visible, setVisible] = signal(true);
- * div({ nodes: [show(() => visible(), span({ nodes: "I toggle!" }))] });
+ * div([show(() => visible(), span("I toggle!"))]);
  * ```
  */
 export function show<T extends Element>(condition: () => boolean, element: T): T {
@@ -37,8 +37,8 @@ export function show<T extends Element>(condition: () => boolean, element: T): T
  * ```ts
  * when(
  *   () => isLoggedIn(),
- *   () => div({ nodes: "Welcome!" }),
- *   () => div({ nodes: "Please log in" })
+ *   () => div("Welcome!"),
+ *   () => div("Please log in")
  * );
  * ```
  */
@@ -105,7 +105,7 @@ export function when<T>(condition: () => T, thenBranch: () => NodeChild, elseBra
  *     error: () => ErrorMessage(),
  *     success: () => Content(),
  *   },
- *   () => div({ nodes: "Unknown status" })
+ *   () => div("Unknown status")
  * );
  * ```
  */

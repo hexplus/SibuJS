@@ -227,9 +227,10 @@ export function query<T>(
       }
     }
 
+    const keyChanged = currentKey !== key;
     currentKey = key;
     const entry = getOrCreateEntry(key, initialData);
-    entry.subscribers++;
+    if (keyChanged || entry.subscribers === 0) entry.subscribers++;
     if (entry.gcTimer !== null) {
       clearTimeout(entry.gcTimer);
       entry.gcTimer = null;

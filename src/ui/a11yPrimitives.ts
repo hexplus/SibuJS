@@ -136,10 +136,10 @@ export interface ListboxHandle {
  *
  * @example
  * ```ts
- * const container = ul({ nodes: [
- *   li({ role: "option", "data-value": "a", nodes: "Apple" }),
- *   li({ role: "option", "data-value": "b", nodes: "Banana" }),
- * ]}) as HTMLElement;
+ * const container = ul([
+ *   li({ role: "option", "data-value": "a" }, "Apple"),
+ *   li({ role: "option", "data-value": "b" }, "Banana"),
+ * ]) as HTMLElement;
  *
  * const lb = createListbox(container, { onSelect: v => console.log(v) });
  * ```
@@ -315,8 +315,8 @@ export interface DialogAriaHandle {
  * const dlg = document.createElement("div");
  * const aria = createDialogAria(dlg, { alert: false });
  * dlg.append(
- *   h2({ id: aria.titleId, nodes: "Delete?" }),
- *   p({ id: aria.descriptionId, nodes: "This cannot be undone." }),
+ *   h2({ id: aria.titleId }, "Delete?"),
+ *   p({ id: aria.descriptionId }, "This cannot be undone."),
  * );
  * ```
  */

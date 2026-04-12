@@ -52,14 +52,11 @@ export interface FormActionHandle<TArgs extends unknown[], TResult> {
  *   return res.json();
  * });
  *
- * form({
- *   on: { submit: save.onSubmit },
- *   nodes: [
- *     input({ name: "title" }),
- *     button({ disabled: save.pending, nodes: () => (save.pending() ? "Saving..." : "Save") }),
- *     when(() => save.error() != null, () => div({ class: "error", nodes: () => String(save.error()) })),
- *   ],
- * });
+ * form({ on: { submit: save.onSubmit } }, [
+ *   input({ name: "title" }),
+ *   button({ disabled: save.pending }, () => (save.pending() ? "Saving..." : "Save")),
+ *   when(() => save.error() != null, () => div("error", () => String(save.error()))),
+ * ]);
  * ```
  */
 export function formAction<TArgs extends unknown[], TResult>(

@@ -103,7 +103,7 @@ export type AdaptedComponent = (props?: AdaptedComponentProps) => Element;
  * });
  *
  * const { Button } = adapter.components;
- * Button({ variant: "raised", nodes: "Click me" });
+ * Button({ variant: "raised" }, "Click me");
  * ```
  */
 export function componentAdapter(config: AdapterConfig): {

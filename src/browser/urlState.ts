@@ -8,7 +8,9 @@ import { signal } from "../core/signals/signal";
  * to sync a handful of UI state bits with the URL (filters, tabs, modals)
  * without a full router setup.
  *
- * Listens to `popstate` so browser back/forward updates the signals.
+ * Listens to both `popstate` (back/forward) and `hashchange` (anchor clicks,
+ * direct `location.hash` assignments) so the signals stay in sync regardless
+ * of how the URL was changed.
  *
  * @example
  * ```ts
@@ -48,16 +50,27 @@ export function urlState(): {
     };
   }
 
-  const [params, setParamsSignal] = signal(new URLSearchParams(window.location.search));
-  const [hash, setHashSignal] = signal(window.location.hash);
+  let lastSearch = window.location.search;
+  let lastHash = window.location.hash;
 
-  const syncFromLocation = () => {
-    setParamsSignal(new URLSearchParams(window.location.search));
-    setHashSignal(window.location.hash);
-  };
+  const [params, setParamsSignal] = signal(new URLSearchParams(lastSearch));
+  const [hash, setHashSignal] = signal(lastHash);
 
-  const onPopState = () => syncFromLocation();
-  window.addEventListener("popstate", onPopState);
+  function syncFromLocation() {
+    const currentSearch = window.location.search;
+    const currentHash = window.location.hash;
+    if (currentSearch !== lastSearch) {
+      lastSearch = currentSearch;
+      setParamsSignal(new URLSearchParams(currentSearch));
+    }
+    if (currentHash !== lastHash) {
+      lastHash = currentHash;
+      setHashSignal(currentHash);
+    }
+  }
+
+  window.addEventListener("popstate", syncFromLocation);
+  window.addEventListener("hashchange", syncFromLocation);
 
   function setParams(next: URLSearchParams | Record<string, string>, opts: UrlStateOptions = {}) {
     const p = next instanceof URLSearchParams ? next : new URLSearchParams(next);
@@ -65,19 +78,22 @@ export function urlState(): {
     const newUrl = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
     if (opts.replace) window.history.replaceState(null, "", newUrl);
     else window.history.pushState(null, "", newUrl);
+    lastSearch = window.location.search;
     setParamsSignal(new URLSearchParams(p));
   }
 
   function setHash(next: string, opts: UrlStateOptions = {}) {
-    const normalized = next.startsWith("#") ? next : next ? `#${next}` : "";
+    const normalized = next && next !== "#" ? (next.startsWith("#") ? next : `#${next}`) : "";
     const newUrl = `${window.location.pathname}${window.location.search}${normalized}`;
     if (opts.replace) window.history.replaceState(null, "", newUrl);
     else window.history.pushState(null, "", newUrl);
+    lastHash = normalized;
     setHashSignal(normalized);
   }
 
   function dispose() {
-    window.removeEventListener("popstate", onPopState);
+    window.removeEventListener("popstate", syncFromLocation);
+    window.removeEventListener("hashchange", syncFromLocation);
   }
 
   return { params, hash, setParams, setHash, dispose };

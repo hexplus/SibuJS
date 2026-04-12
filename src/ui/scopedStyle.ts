@@ -81,12 +81,19 @@ export function scopedStyle(css: string): { scope: string; attr: string } {
   // Sanitize CSS to prevent data exfiltration attacks
   const safeCss = sanitizeCSS(css);
 
-  // Prefix all CSS selectors with the scope attribute
+  // Prefix all CSS selectors with the scope attribute.
+  // Insert [attr] BEFORE any pseudo-element (::before, ::after, etc.)
+  // since attribute selectors after pseudo-elements are invalid CSS.
   const scopedCSS = safeCss.replace(/([^\r\n,{}]+)(,(?=[^}]*{)|\s*{)/g, (match, selector, delimiter) => {
     const trimmed = selector.trim();
     // Skip @-rules and keyframe selectors
     if (trimmed.startsWith("@") || trimmed.startsWith("from") || trimmed.startsWith("to") || /^\d+%$/.test(trimmed)) {
       return match;
+    }
+    // Split at pseudo-element boundary (::) and insert scope before it
+    const pseudoIdx = trimmed.indexOf("::");
+    if (pseudoIdx >= 0) {
+      return `${trimmed.slice(0, pseudoIdx)}[${attr}]${trimmed.slice(pseudoIdx)}${delimiter}`;
     }
     return `${trimmed}[${attr}]${delimiter}`;
   });

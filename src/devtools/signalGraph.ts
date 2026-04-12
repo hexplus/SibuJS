@@ -191,57 +191,56 @@ export function createTraceProfiler(): TraceProfilerHandle {
   const start = typeof performance !== "undefined" ? performance.now() : Date.now();
   let recording = true;
 
-  const onEffectStart = (payload: unknown) => {
+  function now(): number {
+    return (typeof performance !== "undefined" ? performance.now() : Date.now()) - start;
+  }
+
+  const onEffectCreate = (payload: unknown) => {
     if (!recording) return;
-    const now = (typeof performance !== "undefined" ? performance.now() : Date.now()) - start;
-    const label = (payload as { name?: string }).name ?? "effect";
     events.push({
-      name: label,
+      name: (payload as { name?: string }).name ?? "effect",
       cat: "effect",
-      ph: "B",
-      ts: Math.floor(now * 1000),
+      ph: "I",
+      ts: Math.floor(now() * 1000),
       tid: 0,
       pid: 0,
     });
   };
-  const onEffectEnd = (payload: unknown) => {
+  const onEffectDestroy = (payload: unknown) => {
     if (!recording) return;
-    const now = (typeof performance !== "undefined" ? performance.now() : Date.now()) - start;
-    const label = (payload as { name?: string }).name ?? "effect";
     events.push({
-      name: label,
+      name: (payload as { name?: string }).name ?? "effect:destroy",
       cat: "effect",
-      ph: "E",
-      ts: Math.floor(now * 1000),
+      ph: "I",
+      ts: Math.floor(now() * 1000),
       tid: 0,
       pid: 0,
     });
   };
-  const onSignalSet = (payload: unknown) => {
+  const onSignalUpdate = (payload: unknown) => {
     if (!recording) return;
-    const now = (typeof performance !== "undefined" ? performance.now() : Date.now()) - start;
-    const label = (payload as { name?: string }).name ?? "signal";
+    const p = payload as { name?: string; oldValue?: unknown; newValue?: unknown };
     events.push({
-      name: label,
+      name: p.name ?? "signal",
       cat: "signal",
       ph: "I",
-      ts: Math.floor(now * 1000),
+      ts: Math.floor(now() * 1000),
       tid: 0,
       pid: 0,
-      args: (payload as { args?: Record<string, unknown> }).args,
+      args: p.oldValue !== undefined ? { oldValue: String(p.oldValue), newValue: String(p.newValue) } : undefined,
     });
   };
 
-  const offStart = hook.on("effect:start", onEffectStart);
-  const offEnd = hook.on("effect:end", onEffectEnd);
-  const offSet = hook.on("signal:set", onSignalSet);
+  const offCreate = hook.on("effect:create", onEffectCreate);
+  const offDestroy = hook.on("effect:destroy", onEffectDestroy);
+  const offUpdate = hook.on("signal:update", onSignalUpdate);
 
   function stop(): ProfilerEvent[] {
     if (!recording) return events;
     recording = false;
-    offStart();
-    offEnd();
-    offSet();
+    offCreate();
+    offDestroy();
+    offUpdate();
     return events;
   }
 
